@@ -21,4 +21,9 @@ export default defineSchema({
         imageIds: v.optional(v.array(v.string())), // New field for multiple screenshots
         userId: v.optional(v.string()), // For future auth support
     }).index("by_entry_date", ["entryDate"]),
+    users: defineTable({
+        email: v.string(),
+        password: v.string(),
+        name: v.optional(v.string()),
+    }).index("by_email", ["email"]),
 });

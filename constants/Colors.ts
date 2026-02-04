@@ -20,18 +20,34 @@ export const Colors = {
         tabIconSelected: tintColorDark,
     },
     // Premium Fintech Colors
-    professional: {
-        background: '#000000', // True Black
-        card: '#121212', // Material Surface
-        text: '#FFFFFF',
-        textMuted: '#8E8E93',
-        primary: '#00E5FF', // Cyan Accent
-        success: '#00C853', // Vivid Green
-        danger: '#FF3D00', // Vivid Red
-        warning: '#FFD600',
-        border: '#2C2F33',
-        chartLine: '#00E5FF',
-        chartGradientStart: 'rgba(0, 229, 255, 0.3)',
-        chartGradientEnd: 'rgba(0, 229, 255, 0.0)',
-    }
+    professionalDark: {
+        background: '#09090B', // Zinc 950
+        card: '#18181B', // Zinc 900
+        text: '#FAFAFA', // Zinc 50
+        textMuted: '#A1A1AA', // Zinc 400
+        primary: '#38BDF8', // Sky 400
+        success: '#4ADE80', // Green 400
+        danger: '#F87171', // Red 400
+        warning: '#FACC15', // Yellow 400
+        border: '#27272A', // Zinc 800
+        chartLine: '#38BDF8',
+        chartGradientStart: 'rgba(56, 189, 248, 0.3)',
+        chartGradientEnd: 'rgba(56, 189, 248, 0.0)',
+    },
+    professionalLight: {
+        background: '#F8FAFC', // Slate 50
+        card: '#FFFFFF',
+        text: '#0F172A', // Slate 900
+        textMuted: '#64748B', // Slate 500
+        primary: '#2563EB', // Blue 600
+        success: '#16A34A', // Green 600
+        danger: '#DC2626', // Red 600
+        warning: '#CA8A04', // Yellow 600
+        border: '#E2E8F0', // Slate 200
+        chartLine: '#2563EB',
+        chartGradientStart: 'rgba(37, 99, 235, 0.2)',
+        chartGradientEnd: 'rgba(37, 99, 235, 0.0)',
+    },
+    // Backward compatibility (default to dark for now until Context switches)
+    get professional() { return this.professionalDark; }
 };

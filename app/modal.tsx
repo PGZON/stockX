@@ -1,4 +1,5 @@
-import { Colors } from '@/constants/Colors';
+import { FadeInView } from '@/components/FadeInView';
+import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from 'convex/react';
@@ -6,15 +7,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function ModalScreen() {
+  const { colors, isDark } = useTheme();
   const [ticker, setTicker] = useState('');
   const [entryPrice, setEntryPrice] = useState('');
   const [exitPrice, setExitPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [direction, setDirection] = useState<'LONG' | 'SHORT'>('LONG');
-  const [status, setStatus] = useState('WIN'); // WIN, LOSS, BE
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState<string[]>([]);
 
@@ -70,21 +71,19 @@ export default function ModalScreen() {
         });
 
         imageIds = await Promise.all(uploadPromises);
-        imageId = imageIds[0]; // Set main image as the first one
+        imageId = imageIds[0];
       }
 
       // Calculate logic
       const entry = parseFloat(entryPrice);
       const exit = exitPrice ? parseFloat(exitPrice) : entry;
       const qty = parseFloat(quantity);
-
       let pl = 0;
       if (direction === 'LONG') {
         pl = (exit - entry) * qty;
       } else {
         pl = (entry - exit) * qty;
       }
-
       const calculatedStatus = pl > 0 ? "WIN" : (pl < 0 ? "LOSS" : "BE");
 
       await addTrade({
@@ -96,8 +95,8 @@ export default function ModalScreen() {
         status: calculatedStatus,
         pl,
         entryDate: Date.now(),
-        imageId, // Keep for backward compatibility/thumbnail
-        imageIds, // New array field
+        imageId,
+        imageIds,
         timeFrame: '1h',
       });
 
@@ -111,225 +110,243 @@ export default function ModalScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+    >
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-        {/* Ticker Input */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Ticker Symbol</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. AAPL"
-            placeholderTextColor={Colors.professional.textMuted}
-            value={ticker}
-            onChangeText={setTicker}
-            autoCapitalize="characters"
-          />
-        </View>
-
-        {/* Direction Switch */}
-        <View style={styles.row}>
-          <TouchableOpacity
-            style={[styles.directionBtn, direction === 'LONG' && styles.longBtn]}
-            onPress={() => setDirection('LONG')}
-          >
-            <Text style={[styles.btnText, direction === 'LONG' && styles.activeBtnText]}>LONG</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.directionBtn, direction === 'SHORT' && styles.shortBtn]}
-            onPress={() => setDirection('SHORT')}
-          >
-            <Text style={[styles.btnText, direction === 'SHORT' && styles.activeBtnText]}>SHORT</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Prices */}
-        <View style={styles.row}>
-          <View style={[styles.inputGroup, { flex: 1 }]}>
-            <Text style={styles.label}>Entry Price</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0.00"
-              placeholderTextColor={Colors.professional.textMuted}
-              keyboardType="numeric"
-              value={entryPrice}
-              onChangeText={setEntryPrice}
-            />
+        <FadeInView delay={0} slideUp>
+          {/* Ticker Input */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Ticker Symbol</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Ionicons name="search-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="e.g. BTCUSD"
+                placeholderTextColor={colors.textMuted}
+                value={ticker}
+                onChangeText={setTicker}
+                autoCapitalize="characters"
+              />
+            </View>
           </View>
-          <View style={[styles.inputGroup, { flex: 1 }]}>
-            <Text style={styles.label}>Exit Price</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0.00"
-              placeholderTextColor={Colors.professional.textMuted}
-              keyboardType="numeric"
-              value={exitPrice}
-              onChangeText={setExitPrice}
-            />
+        </FadeInView>
+
+        <FadeInView delay={100} slideUp>
+          {/* Direction Switch */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Type</Text>
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={[styles.directionBtn, { backgroundColor: colors.card, borderColor: colors.border }, direction === 'LONG' && { backgroundColor: 'rgba(0, 200, 5, 0.2)', borderColor: colors.success }]}
+                onPress={() => setDirection('LONG')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-up" size={16} color={direction === 'LONG' ? colors.success : colors.textMuted} />
+                <Text style={[styles.btnText, { color: colors.textMuted }, direction === 'LONG' && { color: colors.text }]}>LONG</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.directionBtn, { backgroundColor: colors.card, borderColor: colors.border }, direction === 'SHORT' && { backgroundColor: 'rgba(255, 59, 48, 0.2)', borderColor: colors.danger }]}
+                onPress={() => setDirection('SHORT')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-down" size={16} color={direction === 'SHORT' ? colors.danger : colors.textMuted} />
+                <Text style={[styles.btnText, { color: colors.textMuted }, direction === 'SHORT' && { color: colors.text }]}>SHORT</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </FadeInView>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Quantity</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="1"
-            placeholderTextColor={Colors.professional.textMuted}
-            keyboardType="numeric"
-            value={quantity}
-            onChangeText={setQuantity}
-          />
-        </View>
-
-        {/* Screenshot Upload */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Screenshots</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageList}>
-            {images.map((imgUri, index) => (
-              <View key={index} style={styles.imageWrapper}>
-                <Image source={{ uri: imgUri }} style={styles.previewThumbnail} />
-                <TouchableOpacity onPress={() => removeImage(index)} style={styles.removeBtn}>
-                  <Ionicons name="close-circle" size={20} color={Colors.professional.danger} />
-                </TouchableOpacity>
+        <FadeInView delay={200} slideUp>
+          {/* Prices */}
+          <View style={styles.row}>
+            <View style={[styles.inputGroup, { flex: 1 }]}>
+              <Text style={[styles.label, { color: colors.textMuted }]}>Entry Price</Text>
+              <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={{ color: colors.textMuted, marginRight: 4, fontWeight: '600' }}>₹</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="numeric"
+                  value={entryPrice}
+                  onChangeText={setEntryPrice}
+                />
               </View>
-            ))}
-            <TouchableOpacity style={styles.addMoreBox} onPress={pickImage}>
-              <Ionicons name="add" size={30} color={Colors.professional.primary} />
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
+            </View>
+            <View style={[styles.inputGroup, { flex: 1 }]}>
+              <Text style={[styles.label, { color: colors.textMuted }]}>Exit Price</Text>
+              <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={{ color: colors.textMuted, marginRight: 4, fontWeight: '600' }}>₹</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="numeric"
+                  value={exitPrice}
+                  onChangeText={setExitPrice}
+                />
+              </View>
+            </View>
+          </View>
 
-        <TouchableOpacity
-          style={[styles.saveBtn, loading && { opacity: 0.7 }]}
-          onPress={handleSave}
-          disabled={loading}
-        >
-          {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>Save Log</Text>}
-        </TouchableOpacity>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Quantity</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Ionicons name="layers-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="1"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="numeric"
+                value={quantity}
+                onChangeText={setQuantity}
+              />
+            </View>
+          </View>
+        </FadeInView>
+
+        <FadeInView delay={300} slideUp>
+          {/* Screenshot Upload */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Screenshots</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageList}>
+              {images.map((imgUri, index) => (
+                <View key={index} style={styles.imageWrapper}>
+                  <Image source={{ uri: imgUri }} style={[styles.previewThumbnail, { borderColor: colors.border }]} />
+                  <TouchableOpacity onPress={() => removeImage(index)} style={styles.removeBtn}>
+                    <Ionicons name="close-circle" size={24} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity style={[styles.addMoreBox, { borderColor: colors.border, backgroundColor: 'rgba(0,0,0,0.02)' }]} onPress={pickImage}>
+                <Ionicons name="images-outline" size={24} color={colors.primary} />
+                <Text style={{ fontSize: 10, color: colors.primary, marginTop: 4, fontWeight: '600' }}>Add Image</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </FadeInView>
+
+        <FadeInView delay={400} slideUp>
+          <TouchableOpacity
+            style={[styles.saveBtn, { backgroundColor: colors.primary }, loading && { opacity: 0.7 }]}
+            onPress={handleSave}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveBtnText}>Save Log</Text>}
+          </TouchableOpacity>
+        </FadeInView>
 
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.professional.background,
   },
   scrollContent: {
-    padding: 20,
-    gap: 20,
+    padding: 24,
+    gap: 24,
+    paddingBottom: 50
   },
   label: {
-    color: Colors.professional.textMuted,
     marginBottom: 8,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 0.5
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: 10
   },
   input: {
-    backgroundColor: Colors.professional.card,
-    borderRadius: 12,
-    padding: 16,
-    color: Colors.professional.text,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: Colors.professional.border,
+    flex: 1,
+    height: '100%',
+    fontWeight: '500'
   },
   inputGroup: {
     marginBottom: 0,
   },
   row: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
   },
   directionBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.professional.card,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.professional.border,
-  },
-  longBtn: {
-    backgroundColor: 'rgba(0, 200, 5, 0.2)', // Green tint
-    borderColor: Colors.professional.success,
-  },
-  shortBtn: {
-    backgroundColor: 'rgba(255, 59, 48, 0.2)', // Red tint
-    borderColor: Colors.professional.danger,
-  },
-  btnText: {
-    color: Colors.professional.textMuted,
-    fontWeight: 'bold',
-  },
-  activeBtnText: {
-    color: Colors.professional.text,
-  },
-  uploadBox: {
-    height: 150,
-    backgroundColor: Colors.professional.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.professional.border,
-    borderStyle: 'dashed',
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    borderWidth: 1,
   },
-  uploadText: {
-    color: Colors.professional.primary,
-    marginTop: 8,
-    fontWeight: '600',
+  btnText: {
+    fontWeight: 'bold',
+    fontSize: 14
   },
   imageList: {
     flexDirection: 'row',
     marginBottom: 10,
   },
   imageWrapper: {
-    marginRight: 10,
-    width: 100,
-    height: 100,
+    marginRight: 12,
+    width: 90,
+    height: 90,
   },
   previewThumbnail: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
+    width: 90,
+    height: 90,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.professional.border,
   },
   removeBtn: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#000',
-    borderRadius: 12,
+    top: -8,
+    right: -8,
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    overflow: 'hidden'
   },
   addMoreBox: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
+    width: 90,
+    height: 90,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.professional.border,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.professional.card,
   },
-
   saveBtn: {
-    backgroundColor: Colors.professional.primary,
     paddingVertical: 18,
-    borderRadius: 12,
+    borderRadius: 20,
     alignItems: 'center',
     marginTop: 10,
     marginBottom: 40,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4
   },
   saveBtnText: {
-    color: '#000',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 16,
   }

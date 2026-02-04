@@ -1,15 +1,16 @@
-import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, ViewStyle } from 'react-native';
 
 interface SkeletonProps {
-    width?: number | string;
-    height?: number | string;
+    width?: ViewStyle['width'];
+    height?: ViewStyle['height'];
     borderRadius?: number;
     style?: ViewStyle;
 }
 
 export const Skeleton = ({ width, height, borderRadius = 8, style }: SkeletonProps) => {
+    const { colors } = useTheme();
     const opacity = useRef(new Animated.Value(0.3)).current;
 
     useEffect(() => {
@@ -41,6 +42,8 @@ export const Skeleton = ({ width, height, borderRadius = 8, style }: SkeletonPro
                     height,
                     borderRadius,
                     opacity,
+                    backgroundColor: colors.card,
+                    borderColor: colors.border
                 },
                 style
             ]}
@@ -50,8 +53,6 @@ export const Skeleton = ({ width, height, borderRadius = 8, style }: SkeletonPro
 
 const styles = StyleSheet.create({
     skeleton: {
-        backgroundColor: Colors.professional.card, // Or a slightly lighter/darker shade based on theme
         borderWidth: 1,
-        borderColor: Colors.professional.border,
     },
 });

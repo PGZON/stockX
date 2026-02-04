@@ -1,194 +1,153 @@
-import { Colors } from '@/constants/Colors';
+import { FadeInView } from '@/components/FadeInView';
+import { Skeleton } from '@/components/Skeleton';
+import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from 'convex/react';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import React, { useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import XLSX from 'xlsx';
-
-import { router } from 'expo-router';
-import { TextInput } from 'react-native';
-
-import { Skeleton } from '@/components/Skeleton';
-// ... imports
 
 export default function LogsScreen() {
+    const { colors, theme } = useTheme();
     const tradesQuery = useQuery(api.trades.getTrades, {});
     const loading = tradesQuery === undefined;
     const trades = tradesQuery || [];
+    const params = useLocalSearchParams();
 
-    const [exporting, setExporting] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState<'ALL' | 'WIN' | 'LOSS'>('ALL');
+    const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+    const [dateFilter, setDateFilter] = useState<string | null>(null);
+
+    // Initial Date Filter from Params
+    useEffect(() => {
+        if (params.date) {
+            setDateFilter(params.date as string);
+        }
+    }, [params.date]);
 
     const filteredTrades = trades.filter(t => {
         const matchesSearch = t.ticker.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesStatus = filterStatus === 'ALL' || t.status === filterStatus;
-        return matchesSearch && matchesStatus;
+
+        let matchesDate = true;
+        if (dateFilter) {
+            const tradeDate = new Date(t.entryDate).toISOString().split('T')[0];
+            matchesDate = tradeDate === dateFilter;
+        }
+
+        return matchesSearch && matchesStatus && matchesDate;
+    }).sort((a, b) => {
+        const dateA = new Date(a.entryDate).getTime();
+        const dateB = new Date(b.entryDate).getTime();
+        return sortOrder === 'ASC' ? dateA - dateB : dateB - dateA;
     });
 
-    const generateHtml = () => {
-        let rows = trades.map(t => `
-      <tr>
-        <td>${new Date(t.entryDate).toLocaleDateString()}</td>
-        <td>${t.ticker}</td>
-        <td>${t.direction}</td>
-        <td>₹{t.entryPrice}</td>
-        <td>₹{t.exitPrice || '-'}</td>
-        <td style="color: ${t.pl && t.pl >= 0 ? 'green' : 'red'}">${t.pl ? '₹' + t.pl.toFixed(2) : '-'}</td>
-      </tr>
-    `).join('');
-
-        return `
-      <html>
-        <head>
-          <style>
-            body { font-family: Helvetica, sans-serif; padding: 20px; }
-            h1 { text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-          </style>
-        </head>
-        <body>
-          <h1>Trade Log</h1>
-          <table>
-            <tr>
-              <th>Date</th>
-              <th>Ticker</th>
-              <th>Direction</th>
-              <th>Entry</th>
-              <th>Exit</th>
-              <th>P/L</th>
-            </tr>
-            ${rows}
-          </table>
-        </body>
-      </html>
-    `;
-    };
-
-    const exportPDF = async () => {
-        try {
-            setExporting(true);
-            const html = generateHtml();
-            const { uri } = await Print.printToFileAsync({ html });
-            await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
-        } catch (error) {
-            Alert.alert("Export Error", "Failed to export PDF");
-            console.error(error);
-        } finally {
-            setExporting(false);
-        }
-    };
-
-    const exportExcel = async () => {
-        try {
-            setExporting(true);
-            const ws = XLSX.utils.json_to_sheet(trades.map(t => ({
-                Date: new Date(t.entryDate).toLocaleDateString(),
-                Ticker: t.ticker,
-                Direction: t.direction,
-                Status: t.status,
-                Entry: t.entryPrice,
-                Exit: t.exitPrice,
-                Quantity: t.quantity,
-                PL: t.pl
-            })));
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Trades");
-
-            const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-            const uri = ((FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory) + 'trades.xlsx';
-
-            await FileSystem.writeAsStringAsync(uri, wbout, {
-                encoding: "base64"
-            });
-
-            await Sharing.shareAsync(uri, {
-                mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                dialogTitle: 'Export Trade Data'
-            });
-        } catch (error) {
-            Alert.alert("Export Error", "Failed to export Excel");
-            console.error(error);
-        } finally {
-            setExporting(false);
-        }
-    };
-
-    const renderItem = ({ item }: { item: any }) => (
-        <TouchableOpacity onPress={() => router.push({ pathname: "/trade/[id]", params: { id: item._id } })} activeOpacity={0.7}>
-            <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={[styles.badge, { backgroundColor: item.direction === 'LONG' ? 'rgba(0,200,5,0.2)' : 'rgba(255,59,48,0.2)' }]}>
-                            <Text style={[styles.badgeText, { color: item.direction === 'LONG' ? Colors.professional.success : Colors.professional.danger }]}>
-                                {item.direction}
-                            </Text>
+    const renderItem = ({ item, index }: { item: any; index: number }) => (
+        <FadeInView delay={index * 50} slideUp animateOnFocus>
+            <TouchableOpacity onPress={() => router.push({ pathname: "/trade/[id]", params: { id: item._id } })} activeOpacity={0.7}>
+                <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <View style={styles.cardHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <View style={[styles.iconBox, {
+                                backgroundColor: item.direction === 'LONG' ? `${colors.success}15` : `${colors.danger}15`
+                            }]}>
+                                <Ionicons
+                                    name={item.direction === 'LONG' ? "arrow-up" : "arrow-down"}
+                                    size={16}
+                                    color={item.direction === 'LONG' ? colors.success : colors.danger}
+                                />
+                            </View>
+                            <View>
+                                <Text style={[styles.ticker, { color: colors.text }]}>{item.ticker}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Text style={[styles.date, { color: colors.textMuted }]}>
+                                        {new Date(item.entryDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    </Text>
+                                    <View style={[styles.dot, { backgroundColor: colors.border }]} />
+                                    <Text style={[styles.directionText, { color: item.direction === 'LONG' ? colors.success : colors.danger }]}>
+                                        {item.direction}
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
-                        <Text style={styles.ticker}>{item.ticker}</Text>
-                    </View>
-                    <Text style={styles.date}>{new Date(item.entryDate).toLocaleDateString()}</Text>
-                </View>
 
-                <View style={styles.cardBody}>
-                    <View style={styles.stat}>
-                        <Text style={styles.statLabel}>Entry</Text>
-                        <Text style={styles.statValue}>₹{item.entryPrice}</Text>
+                        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                            <Text style={[styles.plText, { color: item.pl >= 0 ? colors.success : colors.danger }]}>
+                                {item.pl >= 0 ? '+' : ''}₹{Math.abs(item.pl).toFixed(2)}
+                            </Text>
+                            <View style={[styles.statusTag, {
+                                backgroundColor: item.status === 'WIN' ? `${colors.success}20` : (item.status === 'LOSS' ? `${colors.danger}20` : `${colors.warning}20`)
+                            }]}>
+                                <Text style={[styles.statusText, {
+                                    color: item.status === 'WIN' ? colors.success : (item.status === 'LOSS' ? colors.danger : colors.warning)
+                                }]}>{item.status}</Text>
+                            </View>
+                        </View>
                     </View>
-                    <View style={styles.stat}>
-                        <Text style={styles.statLabel}>Exit</Text>
-                        <Text style={styles.statValue}>₹{item.exitPrice || '-'}</Text>
-                    </View>
-                    <View style={styles.stat}>
-                        <Text style={styles.statLabel}>P/L</Text>
-                        <Text style={[styles.statValue, { color: item.pl >= 0 ? Colors.professional.success : Colors.professional.danger }]}>
-                            {item.pl ? '₹' + item.pl.toFixed(2) : '-'}
-                        </Text>
+
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                    <View style={styles.cardBody}>
+                        <View style={styles.stat}>
+                            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Entry</Text>
+                            <Text style={[styles.statValue, { color: colors.text }]}>₹{item.entryPrice}</Text>
+                        </View>
+                        <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
+                        <View style={styles.stat}>
+                            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Exit</Text>
+                            <Text style={[styles.statValue, { color: colors.text }]}>{item.exitPrice ? `₹${item.exitPrice}` : '-'}</Text>
+                        </View>
+                        <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
+                        <View style={styles.stat}>
+                            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Qty</Text>
+                            <Text style={[styles.statValue, { color: colors.text }]}>{item.quantity}</Text>
+                        </View>
                     </View>
                 </View>
-
-                {item.status && (
-                    <View style={[styles.statusTag, {
-                        backgroundColor: item.status === 'WIN' ? Colors.professional.success : (item.status === 'LOSS' ? Colors.professional.danger : Colors.professional.warning)
-                    }]}>
-                        <Text style={styles.statusText}>{item.status}</Text>
-                    </View>
-                )}
-            </View>
-        </TouchableOpacity>
+            </TouchableOpacity>
+        </FadeInView>
     );
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Trade Logs</Text>
-                <View style={styles.actions}>
-                    <TouchableOpacity onPress={exportPDF} style={styles.iconBtn}>
-                        <Ionicons name="document-text" size={24} color={Colors.professional.primary} />
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.title, { color: colors.text }]}>Trade Logs</Text>
+                {dateFilter && (
+                    <TouchableOpacity
+                        style={[styles.dateFilterBadge, { backgroundColor: colors.primary }]}
+                        onPress={() => setDateFilter(null)}
+                    >
+                        <Text style={styles.dateFilterText}>{dateFilter}</Text>
+                        <Ionicons name="close-circle" size={16} color="#FFF" />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={exportExcel} style={styles.iconBtn}>
-                        <Ionicons name="grid" size={24} color={Colors.professional.success} />
-                    </TouchableOpacity>
-                </View>
+                )}
             </View>
 
             <View style={styles.controls}>
-                <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color={Colors.professional.textMuted} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search ticker..."
-                        placeholderTextColor={Colors.professional.textMuted}
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <View style={[styles.searchContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Ionicons name="search" size={20} color={colors.textMuted} />
+                        <TextInput
+                            style={[styles.searchInput, { color: colors.text }]}
+                            placeholder="Search Ticker..."
+                            placeholderTextColor={colors.textMuted}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
+                    </View>
+                    <TouchableOpacity
+                        style={[styles.sortBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                        onPress={() => setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC')}
+                    >
+                        <Ionicons
+                            name={sortOrder === 'DESC' ? "arrow-down" : "arrow-up"}
+                            size={20}
+                            color={colors.text}
+                        />
+                    </TouchableOpacity>
                 </View>
                 <View style={styles.filterRow}>
                     {(['ALL', 'WIN', 'LOSS'] as const).map(status => (
@@ -197,14 +156,17 @@ export default function LogsScreen() {
                             onPress={() => setFilterStatus(status)}
                             style={[
                                 styles.filterChip,
-                                filterStatus === status && styles.filterChipActive,
-                                status === 'WIN' && filterStatus === status && { backgroundColor: Colors.professional.success },
-                                status === 'LOSS' && filterStatus === status && { backgroundColor: Colors.professional.danger }
+                                {
+                                    backgroundColor: colors.card,
+                                    borderColor: colors.border,
+                                },
+                                filterStatus === status && { backgroundColor: `${colors.primary}15`, borderColor: colors.primary },
                             ]}
                         >
                             <Text style={[
                                 styles.filterText,
-                                filterStatus === status && styles.filterTextActive
+                                { color: colors.textMuted },
+                                filterStatus === status && { color: colors.primary, fontWeight: 'bold' }
                             ]}>{status}</Text>
                         </TouchableOpacity>
                     ))}
@@ -214,175 +176,223 @@ export default function LogsScreen() {
             <FlatList
                 data={loading ? Array(5).fill({}) : filteredTrades}
                 keyExtractor={(item, index) => loading ? `skeleton-${index}` : item._id}
-                renderItem={loading ? () => (
-                    <View style={[styles.card, { opacity: 1 }]}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                                <Skeleton width={50} height={20} borderRadius={6} />
-                                <Skeleton width={60} height={20} />
+                renderItem={loading ? ({ index }) => (
+                    <FadeInView delay={index * 50} animateOnFocus>
+                        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                                <View style={{ flexDirection: 'row', gap: 12 }}>
+                                    <Skeleton width={40} height={40} borderRadius={12} />
+                                    <View style={{ gap: 6 }}>
+                                        <Skeleton width={80} height={20} />
+                                        <Skeleton width={60} height={14} />
+                                    </View>
+                                </View>
+                                <Skeleton width={50} height={20} />
                             </View>
-                            <Skeleton width={80} height={16} />
+                            <Skeleton width="100%" height={40} borderRadius={8} />
                         </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Skeleton width={80} height={30} />
-                            <Skeleton width={80} height={30} />
-                            <Skeleton width={80} height={30} />
-                        </View>
-                    </View>
+                    </FadeInView>
                 ) : renderItem}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
-                    !loading ? <Text style={styles.emptyText}>No trades recorded yet.</Text> : null
+                    !loading ? (
+                        <FadeInView delay={200} animateOnFocus>
+                            <View style={styles.emptyContainer}>
+                                <Ionicons name="document-text-outline" size={48} color={colors.textMuted} />
+                                <Text style={[styles.emptyText, { color: colors.textMuted }]}>No trades found.</Text>
+                            </View>
+                        </FadeInView>
+                    ) : null
                 }
             />
+
+            <TouchableOpacity
+                style={[styles.fab, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
+                onPress={() => router.push('/modal')}
+                activeOpacity={0.9}
+            >
+                <Ionicons name="add" size={32} color="#FFF" />
+            </TouchableOpacity>
         </SafeAreaView >
     );
 }
 
 const styles = StyleSheet.create({
+    fab: {
+        position: 'absolute',
+        bottom: 24,
+        right: 24,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+    },
     safeArea: {
         flex: 1,
-        backgroundColor: Colors.professional.background,
     },
     header: {
         paddingHorizontal: 20,
         paddingVertical: 16,
+        alignItems: 'center',
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
         borderBottomWidth: 1,
-        borderBottomColor: Colors.professional.border,
     },
     title: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: 'bold',
-        color: Colors.professional.text,
     },
-    actions: {
+    dateFilterBadge: {
         flexDirection: 'row',
-        gap: 12,
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 16,
+    },
+    dateFilterText: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '600'
     },
     controls: {
         paddingHorizontal: 20,
-        paddingBottom: 10,
+        paddingBottom: 16,
         paddingTop: 10,
-        gap: 12,
+        gap: 16,
     },
     searchContainer: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: Colors.professional.card,
         paddingHorizontal: 12,
-        borderRadius: 12,
-        height: 44,
+        borderRadius: 16, // Softer
+        height: 48,
         borderWidth: 1,
-        borderColor: Colors.professional.border,
-        gap: 8,
+        gap: 10,
+    },
+    sortBtn: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
     },
     searchInput: {
         flex: 1,
-        color: Colors.professional.text,
         fontSize: 16,
     },
     filterRow: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 10,
     },
     filterChip: {
         paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingVertical: 10,
         borderRadius: 20,
-        backgroundColor: Colors.professional.card,
         borderWidth: 1,
-        borderColor: Colors.professional.border,
-    },
-    filterChipActive: {
-        backgroundColor: Colors.professional.primary,
-        borderColor: 'transparent',
     },
     filterText: {
         fontSize: 12,
-        color: Colors.professional.textMuted,
         fontWeight: '600',
-    },
-    filterTextActive: {
-        color: '#000', // Text color for active chip (usually dark for contrast on primary)
-        fontWeight: 'bold',
-    },
-    iconBtn: {
-        padding: 8,
-        backgroundColor: Colors.professional.card,
-        borderRadius: 8,
     },
     listContent: {
         padding: 20,
-        gap: 12,
+        gap: 16,
+        paddingBottom: 100
     },
     card: {
-        backgroundColor: Colors.professional.card,
-        borderRadius: 12,
+        borderRadius: 20,
         padding: 16,
         borderWidth: 1,
-        borderColor: Colors.professional.border,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.03,
+        shadowRadius: 6,
     },
     cardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 16,
     },
-    badge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
-    },
-    badgeText: {
-        fontSize: 10,
-        fontWeight: 'bold',
+    iconBox: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center'
     },
     ticker: {
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: 'bold',
-        color: Colors.professional.text,
     },
     date: {
         fontSize: 12,
-        color: Colors.professional.textMuted,
+    },
+    dot: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+    },
+    directionText: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        textTransform: 'uppercase'
+    },
+    plText: {
+        fontSize: 16,
+        fontWeight: 'bold'
+    },
+    statusTag: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+    },
+    statusText: {
+        fontSize: 10,
+        fontWeight: 'bold',
+    },
+    divider: {
+        height: 1,
+        width: '100%',
+        marginBottom: 16
     },
     cardBody: {
         flexDirection: 'row',
         justifyContent: 'space-between',
     },
     stat: {
-        alignItems: 'flex-start',
+        flex: 1,
+        alignItems: 'center',
+    },
+    verticalDivider: {
+        width: 1,
+        height: '100%',
     },
     statLabel: {
-        fontSize: 10,
-        color: Colors.professional.textMuted,
+        fontSize: 11,
         textTransform: 'uppercase',
+        marginBottom: 4
     },
     statValue: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '600',
-        color: Colors.professional.text,
-        marginTop: 4,
     },
-    statusTag: {
-        position: 'absolute',
-        right: 16,
-        bottom: 16,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    statusText: {
-        fontSize: 10,
-        fontWeight: 'bold',
-        color: '#000',
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 60,
+        gap: 12
     },
     emptyText: {
-        color: Colors.professional.textMuted,
-        textAlign: 'center',
-        marginTop: 40,
+        fontSize: 16,
+        fontWeight: '500'
     }
 });

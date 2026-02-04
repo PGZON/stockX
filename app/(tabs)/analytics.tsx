@@ -1,4 +1,5 @@
-import { Colors } from '@/constants/Colors';
+import { FadeInView } from '@/components/FadeInView';
+import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/convex/_generated/api';
 import { useQuery } from 'convex/react';
 import React, { useMemo } from 'react';
@@ -7,6 +8,7 @@ import { LineChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function AnalyticsScreen() {
+    const { colors, isDark } = useTheme();
     const statsQuery = useQuery(api.trades.getDashboardStats);
     const loading = statsQuery === undefined;
     const stats = statsQuery || {
@@ -26,9 +28,10 @@ export default function AnalyticsScreen() {
     const screenWidth = Dimensions.get('window').width;
 
     const chartConfig = {
-        backgroundGradientFrom: Colors.professional.card,
-        backgroundGradientTo: Colors.professional.card,
-        color: (opacity = 1) => `rgba(0, 229, 255, ${opacity})`,
+        backgroundGradientFrom: colors.card,
+        backgroundGradientTo: colors.card,
+        color: (opacity = 1) => isDark ? `rgba(0, 229, 255, ${opacity})` : `rgba(0, 122, 255, ${opacity})`,
+        labelColor: (opacity = 1) => colors.textMuted,
         strokeWidth: 2,
         barPercentage: 0.5,
         useShadowColorFromDataset: false,
@@ -36,7 +39,7 @@ export default function AnalyticsScreen() {
         propsForDots: {
             r: "4",
             strokeWidth: "2",
-            stroke: Colors.professional.primary
+            stroke: colors.primary
         },
         propsForLabels: {
             fontSize: 10,
@@ -53,7 +56,6 @@ export default function AnalyticsScreen() {
             return cumulative;
         });
 
-        // Take last 10 points to avoid overcrowding
         const slicedData = data.slice(-10);
         const labels = stats.chartData.slice(-10).map(d => d.label);
 
@@ -68,92 +70,98 @@ export default function AnalyticsScreen() {
         {
             name: "Wins",
             population: stats.wins,
-            color: Colors.professional.success,
-            legendFontColor: Colors.professional.text,
+            color: colors.success,
+            legendFontColor: colors.text,
             legendFontSize: 12
         },
         {
             name: "Losses",
             population: stats.losses,
-            color: Colors.professional.danger,
-            legendFontColor: Colors.professional.text,
+            color: colors.danger,
+            legendFontColor: colors.text,
             legendFontSize: 12
         },
         {
             name: "Break Even",
-            population: stats.breakEven || 0, // Ensure breakEven comes from backend or default to 0
-            color: Colors.professional.warning,
-            legendFontColor: Colors.professional.text,
+            population: stats.breakEven || 0,
+            color: colors.warning,
+            legendFontColor: colors.text,
             legendFontSize: 12
         }
     ];
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.container}>
-                <Text style={{ color: 'white', textAlign: 'center', marginTop: 20 }}>Loading Analytics...</Text>
+            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+                <Text style={{ color: colors.text, textAlign: 'center', marginTop: 20 }}>Loading Analytics...</Text>
             </SafeAreaView>
         )
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.title}>Analytics Overview</Text>
+                <Text style={[styles.title, { color: colors.text }]}>Analytics Overview</Text>
 
-                {/* Performance Chart */}
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Cumulative P/L ({'₹'})</Text>
-                    {lineChartData ? (
-                        <LineChart
-                            data={lineChartData}
+                <FadeInView delay={0} animateOnFocus slideUp>
+                    {/* Performance Chart */}
+                    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Text style={[styles.cardTitle, { color: colors.textMuted }]}>Cumulative P/L ({'₹'})</Text>
+                        {lineChartData ? (
+                            <LineChart
+                                data={lineChartData}
+                                width={screenWidth - 40}
+                                height={220}
+                                chartConfig={chartConfig}
+                                bezier
+                                style={styles.chart}
+                                yAxisLabel="₹"
+                            />
+                        ) : (
+                            <Text style={[styles.noData, { color: colors.textMuted }]}>Not enough data for chart</Text>
+                        )}
+                    </View>
+                </FadeInView>
+
+                <FadeInView delay={150} animateOnFocus slideUp>
+                    {/* Win/Loss Distribution */}
+                    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Text style={[styles.cardTitle, { color: colors.textMuted }]}>Win / Loss Ratio</Text>
+                        <PieChart
+                            data={pieChartData}
                             width={screenWidth - 40}
-                            height={220}
+                            height={200}
                             chartConfig={chartConfig}
-                            bezier
-                            style={styles.chart}
-                            yAxisLabel="₹"
+                            accessor={"population"}
+                            backgroundColor={"transparent"}
+                            paddingLeft={"15"}
+                            center={[10, 0]}
+                            absolute
                         />
-                    ) : (
-                        <Text style={styles.noData}>Not enough data for chart</Text>
-                    )}
-                </View>
-
-                {/* Win/Loss Distribution */}
-                <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Win / Loss Ratio</Text>
-                    <PieChart
-                        data={pieChartData}
-                        width={screenWidth - 40}
-                        height={200}
-                        chartConfig={chartConfig}
-                        accessor={"population"}
-                        backgroundColor={"transparent"}
-                        paddingLeft={"15"}
-                        center={[10, 0]}
-                        absolute
-                    />
-                </View>
+                    </View>
+                </FadeInView>
 
                 {/* Additional Stats Grid */}
-                <View style={styles.grid}>
-                    <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>Profit Factor</Text>
-                        <Text style={styles.statValue}>{stats.profitFactor.toFixed(2)}</Text>
+                <FadeInView delay={300} animateOnFocus slideUp>
+                    <View style={styles.grid}>
+                        <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Profit Factor</Text>
+                            <Text style={[styles.statValue, { color: colors.text }]}>{stats.profitFactor.toFixed(2)}</Text>
+                        </View>
+                        <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Avg Win</Text>
+                            <Text style={[styles.statValue, { color: colors.success }]}>₹{stats.avgWin.toFixed(2)}</Text>
+                        </View>
+                        <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Avg Loss</Text>
+                            <Text style={[styles.statValue, { color: colors.danger }]}>₹{stats.avgLoss.toFixed(2)}</Text>
+                        </View>
+                        <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Best Run</Text>
+                            <Text style={[styles.statValue, { color: colors.primary }]}>{stats.bestRun}</Text>
+                        </View>
                     </View>
-                    <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>Avg Win</Text>
-                        <Text style={[styles.statValue, { color: Colors.professional.success }]}>₹{stats.avgWin.toFixed(2)}</Text>
-                    </View>
-                    <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>Avg Loss</Text>
-                        <Text style={[styles.statValue, { color: Colors.professional.danger }]}>₹{stats.avgLoss.toFixed(2)}</Text>
-                    </View>
-                    <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>Best Run</Text>
-                        <Text style={[styles.statValue, { color: Colors.professional.primary }]}>{stats.bestRun}</Text>
-                    </View>
-                </View>
+                </FadeInView>
 
             </ScrollView>
         </SafeAreaView>
@@ -163,7 +171,6 @@ export default function AnalyticsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.professional.background,
     },
     content: {
         padding: 20,
@@ -172,21 +179,17 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: Colors.professional.text,
         marginBottom: 10,
     },
     card: {
-        backgroundColor: Colors.professional.card,
         borderRadius: 16,
         padding: 16,
         borderWidth: 1,
-        borderColor: Colors.professional.border,
         alignItems: 'center',
     },
     cardTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: Colors.professional.textMuted,
         marginBottom: 16,
         alignSelf: 'flex-start',
     },
@@ -195,7 +198,6 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     noData: {
-        color: Colors.professional.textMuted,
         marginVertical: 20,
     },
     grid: {
@@ -205,21 +207,17 @@ const styles = StyleSheet.create({
     },
     statBox: {
         width: '48%',
-        backgroundColor: Colors.professional.card,
         padding: 16,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: Colors.professional.border,
     },
     statLabel: {
         fontSize: 12,
-        color: Colors.professional.textMuted,
         marginBottom: 8,
         textTransform: 'uppercase',
     },
     statValue: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: Colors.professional.text,
     }
 });

@@ -1,19 +1,21 @@
+import { FadeInView } from '@/components/FadeInView';
 import { MetricsDisplay } from '@/components/MetricsDisplay';
 import { RecentActivity } from '@/components/RecentActivity';
-import { Colors } from '@/constants/Colors';
+import { Skeleton } from '@/components/Skeleton';
+import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Skeleton } from '@/components/Skeleton';
-// ... other imports
+const { width } = Dimensions.get('window');
 
 export default function Dashboard() {
+  const { colors, theme, isDark } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const statsQuery = useQuery(api.trades.getDashboardStats);
   const loading = statsQuery === undefined;
@@ -41,86 +43,114 @@ export default function Dashboard() {
 
   const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
+  // Dynamic Gradients
+  const heroGradient = isDark
+    ? ['#1e3a8a', '#172554'] as const // Deep Blue -> Darker Blue
+    : ['#2563EB', '#1d4ed8'] as const; // Blue 600 -> Blue 700
+
+  const heroBorder = isDark ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.2)';
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient
-        colors={[Colors.professional.background, '#0f1014']}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+
+      {/* Background Decorator */}
+      {isDark && (
+        <View style={styles.darkBgDecorator}>
+          <LinearGradient
+            colors={['rgba(29, 78, 216, 0.15)', 'transparent']}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 0.5 }}
+          />
+        </View>
+      )}
 
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.professional.primary} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
           }
         >
           {/* Header Section */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.date}>{currentDate}</Text>
-              <Text style={styles.title}>Dashboard</Text>
+              <Text style={[styles.date, { color: colors.textMuted }]}>{currentDate}</Text>
+              <Text style={[styles.title, { color: colors.text }]}>Hello, Trader</Text>
             </View>
-            <TouchableOpacity style={styles.profileBtn}>
-              <Ionicons name="person-circle-outline" size={32} color={Colors.professional.textMuted} />
+            <TouchableOpacity
+              style={[styles.profileBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push('/(tabs)/profile')}
+            >
+              <Ionicons name="person-outline" size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
 
           {loading ? (
             <View>
-              {/* Hero Skeleton */}
-              <Skeleton width="100%" height={200} borderRadius={30} style={{ marginBottom: 30 }} />
-
-              {/* Metrics Skeleton */}
-              <View style={{ marginBottom: 24 }}>
-                <Skeleton width={150} height={20} style={{ marginBottom: 10 }} />
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                  <Skeleton width="48%" height={100} borderRadius={16} />
-                  <Skeleton width="48%" height={100} borderRadius={16} />
-                  <Skeleton width="48%" height={100} borderRadius={16} />
-                  <Skeleton width="48%" height={100} borderRadius={16} />
-                </View>
-              </View>
-
-              {/* Recent Skeleton */}
-              <View>
-                <Skeleton width={100} height={20} style={{ marginBottom: 10 }} />
-                <Skeleton width="100%" height={80} style={{ marginBottom: 10 }} borderRadius={12} />
-                <Skeleton width="100%" height={80} style={{ marginBottom: 10 }} borderRadius={12} />
-                <Skeleton width="100%" height={80} style={{ marginBottom: 10 }} borderRadius={12} />
-              </View>
+              <Skeleton width="100%" height={220} borderRadius={30} style={{ marginBottom: 30 }} />
+              <Skeleton width="100%" height={300} borderRadius={24} style={{ marginBottom: 24 }} />
             </View>
           ) : (
             <>
-              {/* Main Stats with Gradient */}
-              {/* ... rendered content ... */}
-              <LinearGradient
-                colors={['rgba(0, 229, 255, 0.15)', 'rgba(0, 0, 0, 0)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.heroCard}
-              >
-                <Text style={styles.heroLabel}>Net Profit</Text>
-                <Text style={[styles.heroValue, { color: stats.totalPL >= 0 ? Colors.professional.success : Colors.professional.danger }]}>
-                  ₹{stats.totalPL.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </Text>
-                <View style={styles.heroStatsRow}>
-                  <View style={styles.heroStat}>
-                    <Ionicons name="trending-up" size={16} color={Colors.professional.success} />
-                    <Text style={styles.heroStatText}>{stats.winRate.toFixed(1)}% Win Rate</Text>
-                  </View>
-                  <View style={styles.heroStat}>
-                    <Ionicons name="layers-outline" size={16} color={Colors.professional.primary} />
-                    <Text style={styles.heroStatText}>{stats.totalTrades} Trades</Text>
-                  </View>
-                </View>
-              </LinearGradient>
+              {/* Premium Hero Card */}
+              <FadeInView delay={0}>
+                <TouchableOpacity onPress={() => router.push('/profit-history')} activeOpacity={0.95}>
+                  <LinearGradient
+                    colors={heroGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.heroCard, { borderColor: heroBorder }]}
+                  >
+                    {/* Decorative Circles */}
+                    <View style={styles.circle1} />
+                    <View style={styles.circle2} />
 
-              {/* Metrics Section - Replacing Chart */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Key Metrics</Text>
+                    <View style={styles.heroHeader}>
+                      <View style={styles.netProfitBadge}>
+                        <Ionicons name="wallet-outline" size={16} color="#93C5FD" />
+                        <Text style={styles.netProfitText}>Net Profit</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color="#BFDBFE" />
+                    </View>
+
+                    <Text style={styles.heroValue}>
+                      ₹{stats.totalPL.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+
+                    <View style={styles.heroFooter}>
+                      <View style={styles.heroStatItem}>
+                        <Text style={styles.heroStatLabel}>Win Rate</Text>
+                        <View style={styles.heroStatValueRow}>
+                          <Ionicons name="pie-chart-outline" size={14} color="#4ADE80" />
+                          <Text style={styles.heroStatValue}>{stats.winRate.toFixed(1)}%</Text>
+                        </View>
+                      </View>
+                      <View style={styles.divider} />
+                      <View style={styles.heroStatItem}>
+                        <Text style={styles.heroStatLabel}>Total Trades</Text>
+                        <View style={styles.heroStatValueRow}>
+                          <Ionicons name="stats-chart-outline" size={14} color="#FDBA74" />
+                          <Text style={styles.heroStatValue}>{stats.totalTrades}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.divider} />
+                      <View style={styles.heroStatItem}>
+                        <Text style={styles.heroStatLabel}>Profit Factor</Text>
+                        <View style={styles.heroStatValueRow}>
+                          <Ionicons name="trending-up" size={14} color="#F472B6" />
+                          <Text style={styles.heroStatValue}>{stats.profitFactor.toFixed(2)}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </FadeInView>
+
+              {/* Advanced Metrics */}
+              <FadeInView delay={150} style={styles.section}>
                 <MetricsDisplay
                   wins={stats.wins || 0}
                   losses={stats.losses || 0}
@@ -128,38 +158,19 @@ export default function Dashboard() {
                   avgWin={stats.avgWin || 0}
                   avgLoss={stats.avgLoss || 0}
                   bestRun={stats.bestRun || 0}
-                  trades={stats.recentTrades || []} // Note: recentTrades is currently sliced, we might want full history for calendar if needed. 
-                // Ideally we need a separate prop for calendar usage, but user asked for "archive". 
-                // Waiting on clarification or I will add a new return field from backend for calendar data if recentTrades isn't enough.
-                // For now, let's use recentTrades but the prompt implies a full archive view. 
-                // Actually, to make a real calendar, we need ALL trades dates.
-                // I will update the index.tsx to pass a flattened list of all trades if possible, or assume 
-                // 'recentTrades' was just for the list below. 
-                // Wait, getDashboardStats returns 'recentTrades' sliced.
-                // I should probably pass a new field 'allStats' or similar. 
-                // Let's first just wire it up and see.
-                // Actually the user said "archive calendar view like instagram". 
-                // I will assume for now 'recentTrades' is NOT enough but I don't want to fetch ALL trades in dashboard query if it's heavy.
-                // But for a calendar, we just need dates and status. 
-                // Let's modify the Dashboard to use 'chartData' since that has all trades (or at least mapped data).
-                // ChartData has { value, date, label }. That works for dates!
+                  trades={stats.recentTrades || []}
                 />
-              </View>
+              </FadeInView>
 
               {/* Recent Activity */}
-              <View style={styles.section}>
+              <FadeInView delay={300} style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>History</Text>
-                  <TouchableOpacity onPress={() => router.push('/(tabs)/logs')}>
-                    <Text style={styles.seeAll}>See All</Text>
-                  </TouchableOpacity>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
                 </View>
                 <RecentActivity trades={(stats.recentTrades || []).map(t => ({ ...t, pl: t.pl ?? 0 }))} />
-              </View>
+              </FadeInView>
             </>
           )}
-
-          <View style={{ height: 100 }} />
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -167,97 +178,79 @@ export default function Dashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.professional.background,
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
+  darkBgDecorator: {
+    position: 'absolute',
+    width: '100%',
+    height: 400,
+    top: 0
   },
-  safeArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  date: {
-    fontSize: 12,
-    color: Colors.professional.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: Colors.professional.text,
-  },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 10 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  date: { fontSize: 13, textTransform: 'uppercase', letterSpacing: 1.2, fontWeight: '600', marginBottom: 4 },
+  title: { fontSize: 34, fontWeight: '800', letterSpacing: -0.5 },
   profileBtn: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.professional.card,
-    borderWidth: 1,
-    borderColor: Colors.professional.border,
+    width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', borderWidth: 1
   },
+
+  // Hero Card
   heroCard: {
-    borderRadius: 30,
+    borderRadius: 32,
     padding: 24,
-    marginBottom: 30,
+    marginBottom: 32,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8
   },
-  heroLabel: {
-    fontSize: 16,
-    color: Colors.professional.textMuted,
-    marginBottom: 8,
+  circle1: {
+    position: 'absolute',
+    top: -50, right: -50,
+    width: 200, height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.05)'
   },
+  circle2: {
+    position: 'absolute',
+    bottom: -60, left: -40,
+    width: 150, height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255,255,255,0.05)'
+  },
+  heroHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16
+  },
+  netProfitBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20
+  },
+  netProfitText: { color: '#BFDBFE', fontWeight: '600', fontSize: 14 },
   heroValue: {
-    fontSize: 48, // Massive font size for impact
-    fontWeight: 'bold',
-    marginBottom: 20,
-    letterSpacing: -1,
+    fontSize: 48, fontWeight: '800', color: '#FFFFFF', marginBottom: 24, letterSpacing: -1
   },
-  heroStatsRow: {
-    flexDirection: 'row',
-    gap: 16,
+  heroFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.15)', padding: 16, borderRadius: 20, backdropFilter: 'blur(10px)'
   },
-  heroStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
+  heroStatItem: {
+    alignItems: 'center', flex: 1
   },
-  heroStatText: {
-    color: Colors.professional.text,
-    fontSize: 13,
-    fontWeight: '600',
+  heroStatLabel: {
+    color: '#BFDBFE', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', fontWeight: '600'
   },
-  section: {
-    marginBottom: 24,
+  heroStatValueRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 4
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+  heroStatValue: {
+    color: '#FFFFFF', fontWeight: 'bold', fontSize: 16
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.professional.text,
-    marginBottom: 10,
+  divider: {
+    width: 1, height: '100%', backgroundColor: 'rgba(255,255,255,0.1)'
   },
-  seeAll: {
-    color: Colors.professional.primary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
+
+  section: { marginBottom: 24 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { fontSize: 22, fontWeight: 'bold' },
 });

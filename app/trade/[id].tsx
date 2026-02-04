@@ -1,10 +1,10 @@
 import { Skeleton } from '@/components/Skeleton';
-import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from 'convex/react';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useState } from 'react';
@@ -15,14 +15,13 @@ export default function TradeDetails() {
     const { id } = useLocalSearchParams<{ id: Id<"trades"> }>();
     const router = useRouter();
     const trade = useQuery(api.trades.getTrade, { id: id! });
+    const { colors, isDark } = useTheme();
     const [imageModalVisible, setImageModalVisible] = useState(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-
-
     if (!trade) {
         return (
-            <SafeAreaView style={styles.container} edges={['top']}>
+            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
                 <View style={[styles.header, { borderBottomWidth: 0 }]}>
                     <Skeleton width={40} height={40} borderRadius={20} />
                     <Skeleton width={100} height={24} />
@@ -47,6 +46,7 @@ export default function TradeDetails() {
 
         try {
             const fileName = `trade_${trade.ticker}_${id}.jpg`;
+            // @ts-ignore
             const result = await FileSystem.downloadAsync(
                 trade.imageUrl,
                 FileSystem.documentDirectory + fileName
@@ -60,19 +60,19 @@ export default function TradeDetails() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
             <Stack.Screen options={{ headerShown: false }} />
 
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-                    <Ionicons name="arrow-back" size={24} color={Colors.professional.text} />
+                <TouchableOpacity onPress={() => router.back()} style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Ionicons name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>{trade.ticker}</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{trade.ticker}</Text>
 
                 {trade.imageUrl ? (
-                    <TouchableOpacity onPress={downloadImage} style={styles.iconBtn}>
-                        <Ionicons name="download-outline" size={24} color={Colors.professional.primary} />
+                    <TouchableOpacity onPress={downloadImage} style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Ionicons name="download-outline" size={24} color={colors.primary} />
                     </TouchableOpacity>
                 ) : (
                     <View style={{ width: 40 }} />
@@ -86,50 +86,50 @@ export default function TradeDetails() {
                     backgroundColor: trade.status === 'WIN' ? 'rgba(0, 200, 5, 0.15)' :
                         trade.status === 'LOSS' ? 'rgba(255, 59, 48, 0.15)' :
                             'rgba(255, 215, 0, 0.15)',
-                    borderColor: trade.status === 'WIN' ? Colors.professional.success :
-                        trade.status === 'LOSS' ? Colors.professional.danger :
-                            Colors.professional.warning
+                    borderColor: trade.status === 'WIN' ? colors.success :
+                        trade.status === 'LOSS' ? colors.danger :
+                            colors.warning
                 }]}>
                     <Text style={[styles.resultText, {
-                        color: trade.status === 'WIN' ? Colors.professional.success :
-                            trade.status === 'LOSS' ? Colors.professional.danger :
-                                Colors.professional.warning
+                        color: trade.status === 'WIN' ? colors.success :
+                            trade.status === 'LOSS' ? colors.danger :
+                                colors.warning
                     }]}>
                         {trade.status}
                     </Text>
                     <Text style={[styles.plText, {
-                        color: (trade.pl || 0) >= 0 ? Colors.professional.success : Colors.professional.danger
+                        color: (trade.pl || 0) >= 0 ? colors.success : colors.danger
                     }]}>
-                        {(trade.pl || 0) >= 0 ? '+' : ''}${trade.pl?.toFixed(2)}
+                        {(trade.pl || 0) >= 0 ? '+' : ''}₹{trade.pl?.toFixed(2)}
                     </Text>
                 </View>
 
                 {/* Key Stats Grid */}
                 <View style={styles.gridContainer}>
-                    <View style={styles.gridItem}>
-                        <Text style={styles.label}>Direction</Text>
-                        <Text style={[styles.value, { color: trade.direction === 'LONG' ? Colors.professional.success : Colors.professional.danger }]}>
+                    <View style={[styles.gridItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Text style={[styles.label, { color: colors.textMuted }]}>Direction</Text>
+                        <Text style={[styles.value, { color: trade.direction === 'LONG' ? colors.success : colors.danger }]}>
                             {trade.direction}
                         </Text>
                     </View>
-                    <View style={styles.gridItem}>
-                        <Text style={styles.label}>Quantity</Text>
-                        <Text style={styles.value}>{trade.quantity}</Text>
+                    <View style={[styles.gridItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Text style={[styles.label, { color: colors.textMuted }]}>Quantity</Text>
+                        <Text style={[styles.value, { color: colors.text }]}>{trade.quantity}</Text>
                     </View>
-                    <View style={styles.gridItem}>
-                        <Text style={styles.label}>Entry</Text>
-                        <Text style={styles.value}>${trade.entryPrice}</Text>
+                    <View style={[styles.gridItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Text style={[styles.label, { color: colors.textMuted }]}>Entry</Text>
+                        <Text style={[styles.value, { color: colors.text }]}>₹{trade.entryPrice}</Text>
                     </View>
-                    <View style={styles.gridItem}>
-                        <Text style={styles.label}>Exit</Text>
-                        <Text style={styles.value}>${trade.exitPrice || '-'}</Text>
+                    <View style={[styles.gridItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Text style={[styles.label, { color: colors.textMuted }]}>Exit</Text>
+                        <Text style={[styles.value, { color: colors.text }]}>₹{trade.exitPrice || '-'}</Text>
                     </View>
                 </View>
 
                 {/* Date Badge */}
-                <View style={styles.dateBadge}>
-                    <Ionicons name="calendar-outline" size={14} color={Colors.professional.textMuted} />
-                    <Text style={styles.dateText}>
+                <View style={[styles.dateBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
+                    <Text style={[styles.dateText, { color: colors.textMuted }]}>
                         {new Date(trade.entryDate).toLocaleDateString(undefined, {
                             weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                         })}
@@ -139,7 +139,7 @@ export default function TradeDetails() {
                 {/* Screenshots Gallery */}
                 {((trade.imageUrls && trade.imageUrls.length > 0) || trade.imageUrl) ? (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Chart Screenshots</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Chart Screenshots</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                             {(trade.imageUrls && trade.imageUrls.length > 0 ? trade.imageUrls : [trade.imageUrl!]).map((url, index) => (
                                 <TouchableOpacity
@@ -150,7 +150,7 @@ export default function TradeDetails() {
                                     }}
                                     activeOpacity={0.9}
                                 >
-                                    <Image source={{ uri: url }} style={styles.imagePreview} resizeMode="cover" />
+                                    <Image source={{ uri: url }} style={[styles.imagePreview, { borderColor: colors.border }]} resizeMode="cover" />
                                     <View style={styles.zoomOverlay}>
                                         <Ionicons name="expand" size={20} color="#FFF" />
                                     </View>
@@ -163,9 +163,9 @@ export default function TradeDetails() {
                 {/* Notes */}
                 {trade.notes && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Analysis Notes</Text>
-                        <View style={styles.noteCard}>
-                            <Text style={styles.noteText}>{trade.notes}</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Analysis Notes</Text>
+                        <View style={[styles.noteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                            <Text style={[styles.noteText, { color: colors.text }]}>{trade.notes}</Text>
                         </View>
                     </View>
                 )}
@@ -198,13 +198,6 @@ export default function TradeDetails() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.professional.background,
-    },
-    centered: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: Colors.professional.background,
     },
     header: {
         flexDirection: 'row',
@@ -217,16 +210,13 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: Colors.professional.card,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: Colors.professional.border,
     },
     headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: Colors.professional.text,
     },
     content: {
         padding: 20,
@@ -257,22 +247,18 @@ const styles = StyleSheet.create({
     },
     gridItem: {
         width: '48%', // roughly half
-        backgroundColor: Colors.professional.card,
         padding: 16,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: Colors.professional.border,
     },
     label: {
         fontSize: 12,
-        color: Colors.professional.textMuted,
         marginBottom: 4,
         textTransform: 'uppercase',
     },
     value: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: Colors.professional.text,
     },
     dateBadge: {
         flexDirection: 'row',
@@ -282,13 +268,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 20,
-        backgroundColor: Colors.professional.card,
         borderWidth: 1,
-        borderColor: Colors.professional.border,
         alignItems: 'center',
     },
     dateText: {
-        color: Colors.professional.textMuted,
         fontSize: 12,
     },
     section: {
@@ -297,7 +280,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: Colors.professional.text,
         marginBottom: 16,
     },
     imagePreview: {
@@ -306,7 +288,6 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         backgroundColor: '#000',
         borderWidth: 1,
-        borderColor: Colors.professional.border,
     },
     zoomOverlay: {
         position: 'absolute',
@@ -317,14 +298,11 @@ const styles = StyleSheet.create({
         padding: 6,
     },
     noteCard: {
-        backgroundColor: Colors.professional.card,
         borderRadius: 16,
         padding: 20,
         borderWidth: 1,
-        borderColor: Colors.professional.border,
     },
     noteText: {
-        color: Colors.professional.text,
         fontSize: 16,
         lineHeight: 24,
     },

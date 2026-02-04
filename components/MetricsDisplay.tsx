@@ -1,5 +1,7 @@
-import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
+import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useMemo } from 'react';
@@ -13,169 +15,202 @@ interface MetricsProps {
     avgWin: number;
     avgLoss: number;
     bestRun: number;
-    trades?: any[]; // Pass trades to calculate marked dates
+    trades?: any[];
 }
 
-export const MetricsDisplay = ({ wins, losses, totalTrades, avgWin, avgLoss, bestRun, trades = [] }: MetricsProps) => {
+export const MetricsDisplay = ({ wins, losses, totalTrades, avgWin, avgLoss, bestRun, trades: propTrades = [] }: MetricsProps) => {
+    const { colors, isDark } = useTheme();
+    // Fetch all trades to ensure detailed calendar history
+    const allTradesQuery = useQuery(api.trades.getTrades, {});
+    const trades = allTradesQuery || propTrades;
 
     const markedDates = useMemo(() => {
         const marks: any = {};
         trades.forEach((t: any) => {
             const date = new Date(t.entryDate).toISOString().split('T')[0];
+            const dotColor = t.pl >= 0 ? colors.success : colors.danger;
+
             if (!marks[date]) {
                 marks[date] = {
                     marked: true,
-                    dotColor: t.pl >= 0 ? Colors.professional.success : Colors.professional.danger,
+                    dotColor: dotColor,
                 };
             } else {
-                // If marks already exist, prioritize dot color (e.g. if mixed, maybe show warning or just keep one)
-                // Keeping simple: if any trade on that day is a loss, dot is red, else green
-                if (t.pl < 0) marks[date].dotColor = Colors.professional.danger;
+                if (t.pl < 0) marks[date].dotColor = colors.danger;
             }
         });
         return marks;
-    }, [trades]);
+    }, [trades, colors]);
+
+    // Premium Card Gradient - as const to fix type error
+    const cardGradient = isDark
+        ? ['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.01)'] as const
+        : ['#FFFFFF', '#F8FAFC'] as const;
+
+    const renderStatCard = (title: string, value: string, icon: any, color: string, subValue?: string) => (
+        <LinearGradient
+            colors={cardGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.card, { borderColor: colors.border }]}
+        >
+            <View style={styles.cardHeader}>
+                <View style={[styles.iconBox, { backgroundColor: `${color}15` }]}>
+                    <Ionicons name={icon} size={18} color={color} />
+                </View>
+                <Text style={[styles.label, { color: colors.textMuted }]}>{title}</Text>
+            </View>
+            <Text style={[styles.value, { color: colors.text }]}>{value}</Text>
+            {subValue && <Text style={[styles.subValue, { color: color }]}>{subValue}</Text>}
+        </LinearGradient>
+    );
 
     return (
         <View style={styles.container}>
-            {/* Top Row Stats */}
-            <View style={styles.row}>
-                <LinearGradient colors={['#1A1C24', '#15171e']} style={styles.card}>
-                    <View style={styles.iconBox}>
-                        <Ionicons name="trophy" size={20} color="#FFD700" />
-                    </View>
-                    <Text style={styles.label}>Best Run</Text>
-                    <Text style={styles.value}>{bestRun} Wins</Text>
-                </LinearGradient>
-
-                <LinearGradient colors={['#1A1C24', '#15171e']} style={styles.card}>
-                    <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 200, 5, 0.1)' }]}>
-                        <Ionicons name="trending-up" size={20} color={Colors.professional.success} />
-                    </View>
-                    <Text style={styles.label}>Avg Win</Text>
-                    <Text style={[styles.value, { color: Colors.professional.success }]}>₹{avgWin.toFixed(2)}</Text>
-                </LinearGradient>
-            </View>
-
-            <View style={styles.row}>
-                <LinearGradient colors={['#1A1C24', '#15171e']} style={styles.card}>
-                    <View style={[styles.iconBox, { backgroundColor: 'rgba(255, 59, 48, 0.1)' }]}>
-                        <Ionicons name="trending-down" size={20} color={Colors.professional.danger} />
-                    </View>
-                    <Text style={styles.label}>Avg Loss</Text>
-                    <Text style={[styles.value, { color: Colors.professional.danger }]}>₹{avgLoss.toFixed(2)}</Text>
-                </LinearGradient>
+            {/* Stats Grid */}
+            <View style={styles.grid}>
+                {renderStatCard('Best Run', `${bestRun} Wins`, 'trophy', '#FACC15')}
+                {renderStatCard('Avg Win', `₹${avgWin.toFixed(0)}`, 'trending-up', colors.success)}
+                {renderStatCard('Avg Loss', `₹${Math.abs(avgLoss).toFixed(0)}`, 'trending-down', colors.danger)}
             </View>
 
             {/* Archive Calendar */}
-            <View style={styles.calendarContainer}>
+            <LinearGradient
+                colors={isDark ? ['rgba(25, 25, 28, 0.6)', 'rgba(25, 25, 28, 0.3)'] : ['#FFFFFF', '#F8FAFC']}
+                style={[styles.calendarContainer, { borderColor: colors.border }]}
+            >
                 <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Archive</Text>
-                    <TouchableOpacity onPress={() => router.push('/(tabs)/logs')}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={styles.seeAll}>View Lists</Text>
-                            <Ionicons name="chevron-forward" size={14} color={Colors.professional.primary} />
-                        </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="calendar" size={20} color={colors.primary} />
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Trading Journal</Text>
+                    </View>
+                    <TouchableOpacity
+                        onPress={() => router.push('/(tabs)/logs')}
+                        style={[styles.viewAllBtn, { backgroundColor: `${colors.primary}15` }]}
+                    >
+                        <Text style={[styles.seeAll, { color: colors.primary }]}>View Logs</Text>
+                        <Ionicons name="arrow-forward" size={12} color={colors.primary} />
                     </TouchableOpacity>
                 </View>
 
                 <Calendar
+                    key={isDark ? 'dark' : 'light'} // Force re-render on theme change
                     theme={{
                         backgroundColor: 'transparent',
                         calendarBackground: 'transparent',
-                        textSectionTitleColor: Colors.professional.textMuted,
-                        selectedDayBackgroundColor: Colors.professional.primary,
+                        textSectionTitleColor: colors.textMuted,
+                        selectedDayBackgroundColor: colors.primary,
                         selectedDayTextColor: '#ffffff',
-                        todayTextColor: Colors.professional.primary,
-                        dayTextColor: Colors.professional.text,
-                        textDisabledColor: '#333',
-                        monthTextColor: Colors.professional.text,
-                        arrowColor: Colors.professional.primary,
-                        textDayFontWeight: '600',
+                        todayTextColor: colors.primary,
+                        dayTextColor: colors.text,
+                        textDisabledColor: isDark ? '#444' : '#D1D5DB', // Fixed visibility
+                        monthTextColor: colors.text,
+                        arrowColor: colors.primary,
+                        textDayFontWeight: '500',
                         textMonthFontWeight: 'bold',
                         textDayHeaderFontWeight: '600',
-                        textDayFontSize: 12,
+                        textDayFontSize: 14,
                         textMonthFontSize: 16,
                         textDayHeaderFontSize: 12
                     }}
                     markedDates={markedDates}
                     onDayPress={(day: any) => {
-                        // Optional: Navigate to logs filtered by this date
-                        console.log('selected day', day);
+                        // Navigate to Logs screen with date filter
+                        router.push({
+                            pathname: '/(tabs)/logs',
+                            params: { date: day.dateString }
+                        });
                     }}
                     enableSwipeMonths={true}
                     hideExtraDays={true}
                     style={styles.calendar}
                 />
-            </View>
+            </LinearGradient>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        gap: 12,
+        gap: 16,
         marginBottom: 20,
     },
-    row: {
+    grid: {
         flexDirection: 'row',
         gap: 12,
+        justifyContent: 'space-between'
     },
     card: {
         flex: 1,
         padding: 16,
         borderRadius: 20,
         borderWidth: 1,
-        borderColor: Colors.professional.border,
-        justifyContent: 'center',
-        backgroundColor: Colors.professional.card
+        minHeight: 110,
+        justifyContent: 'space-between',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    cardHeader: {
+        gap: 8,
     },
     iconBox: {
-        width: 36,
-        height: 36,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255, 215, 0, 0.1)',
+        width: 32,
+        height: 32,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
     },
     label: {
-        fontSize: 12,
-        color: Colors.professional.textMuted,
-        marginBottom: 4,
+        fontSize: 11,
         fontWeight: '600',
         textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     value: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: 'bold',
-        color: Colors.professional.text,
+        marginTop: 4,
+    },
+    subValue: {
+        fontSize: 12,
+        fontWeight: '500',
     },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 16,
         paddingHorizontal: 4
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: Colors.professional.text,
+    },
+    viewAllBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
     },
     seeAll: {
-        color: Colors.professional.primary,
         fontSize: 12,
         fontWeight: '600',
-        marginRight: 4
     },
     calendarContainer: {
-        marginTop: 12,
-        backgroundColor: Colors.professional.card,
+        marginTop: 4,
         borderRadius: 24,
-        padding: 16,
+        padding: 20,
         borderWidth: 1,
-        borderColor: Colors.professional.border,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.05,
+        shadowRadius: 20,
+        elevation: 3,
     },
     calendar: {
         borderRadius: 16,

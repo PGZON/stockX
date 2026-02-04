@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts'; // Ensure installed
 
@@ -58,7 +58,9 @@ export const TradeChart = ({ data }: ChartProps) => {
                         pointerLabelHeight: 90,
                         activatePointersOnLongPress: true,
                         autoAdjustPointerLabelPosition: false,
-                        pointerLabelComponent: items => {
+                        pointerLabelComponent: (items: {
+                            date: ReactNode; value: string;
+                        }[]) => {
                             return (
                                 <View
                                     style={{
@@ -74,7 +76,7 @@ export const TradeChart = ({ data }: ChartProps) => {
 
                                     <View style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: 'white' }}>
                                         <Text style={{ fontWeight: 'bold', textAlign: 'center' }}>
-                                            {'$' + items[0].value + '.0'}
+                                            {'₹' + items[0].value + '.0'}
                                         </Text>
                                     </View>
                                 </View>

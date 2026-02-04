@@ -1,9 +1,8 @@
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/context/ThemeContext';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
@@ -13,20 +12,24 @@ function TabBarIcon(props: {
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { colors } = useTheme();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.professional.primary,
-        tabBarInactiveTintColor: Colors.professional.textMuted,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          backgroundColor: Colors.professional.card,
-          borderTopWidth: 0, // seamless
+          backgroundColor: colors.card,
+          borderTopWidth: 0,
           elevation: 0,
           height: Platform.OS === 'ios' ? 90 : 70,
           paddingBottom: Platform.OS === 'ios' ? 30 : 10,
           paddingTop: 10,
+        },
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -59,23 +62,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="add"
         options={{
+          href: null,
           title: '',
-          tabBarIcon: ({ color }) => <View style={{
-            width: 50,
-            height: 50,
-            backgroundColor: Colors.professional.primary,
-            borderRadius: 25,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 20,
-            shadowColor: Colors.professional.primary,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.5,
-            shadowRadius: 8,
-            elevation: 5,
-          }}>
-            <FontAwesome name="plus" size={24} color="black" />
-          </View>,
+          tabBarIcon: ({ color }) => null,
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
@@ -84,9 +73,13 @@ export default function TabLayout() {
           },
         })}
       />
-
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
-
-

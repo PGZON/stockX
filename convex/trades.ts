@@ -167,3 +167,19 @@ export const getDashboardStats = query({
         };
     },
 });
+
+export const getTradesInDateRange = query({
+    args: {
+        startDate: v.number(),
+        endDate: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const trades = await ctx.db
+            .query("trades")
+            .withIndex("by_entry_date", (q) =>
+                q.gte("entryDate", args.startDate).lte("entryDate", args.endDate)
+            )
+            .collect();
+        return trades;
+    },
+});
