@@ -1,10 +1,11 @@
 import { FadeInView } from '@/components/FadeInView';
 import { useAuth } from '@/context/AuthContext';
+import { useCurrency } from '@/context/CurrencyContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useConvex } from 'convex/react';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Image } from 'expo-image';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -16,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function ProfileScreen() {
     const convex = useConvex();
     const { colors, theme, setTheme, isDark } = useTheme();
+    const { currency: globalCurrency } = useCurrency();
+    const [exportCurrency, setExportCurrency] = useState<'USD' | 'INR'>(globalCurrency);
     const [dateRange, setDateRange] = useState({
         startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime(), // Start of current month
         endDate: Date.now(),
@@ -81,16 +84,21 @@ export default function ProfileScreen() {
     };
 
     const exportCSV = async (trades: any[]) => {
-        const header = 'Date,Ticker,Type,Entry Price,Exit Price,Quantity,P&L,Status\n';
+        const currencySymbol = exportCurrency === 'USD' ? '$' : '₹';
+        const header = `Date,Ticker,Type,Entry Price,Stop Loss,Take Profit,Quantity,P&L (${exportCurrency}),Status\n`;
         const rows = trades.map(t => {
             const date = new Date(t.entryDate).toLocaleDateString();
-            return `${date},${t.ticker},${t.direction},${t.entryPrice},${t.exitPrice || ''},${t.quantity},${t.pl || 0},${t.status}`;
+            const plValue = exportCurrency === 'USD' ? (t.plUsd || 0) : (t.plInr || 0);
+            const entry = t.entryPrice || 0;
+            const sl = t.stopLoss || '-';
+            const tp = t.takeProfit || '-';
+            return `${date},${t.ticker},${t.direction},${currencySymbol}${entry},${sl !== '-' ? currencySymbol + sl : sl},${tp !== '-' ? currencySymbol + tp : tp},${t.quantity},${currencySymbol}${plValue.toFixed(2)},${t.status}`;
         }).join('\n');
 
         const csvContent = header + rows;
         const startStr = new Date(dateRange.startDate).toISOString().split('T')[0];
         const endStr = new Date(dateRange.endDate).toISOString().split('T')[0];
-        const fileName = `trades_${startStr}_to_${endStr}.csv`;
+        const fileName = `trades_${exportCurrency}_${startStr}_to_${endStr}.csv`;
 
         // @ts-ignore
         const fileUri = (FileSystem.documentDirectory || FileSystem.cacheDirectory) + fileName;
@@ -101,20 +109,26 @@ export default function ProfileScreen() {
     };
 
     const exportPDF = async (trades: any[]) => {
+        const currencySymbol = exportCurrency === 'USD' ? '$' : '₹';
         let totalPL = 0;
         const rowsHtml = trades.map(t => {
-            totalPL += (t.pl || 0);
-            const isWin = (t.pl || 0) >= 0;
+            const plValue = exportCurrency === 'USD' ? (t.plUsd || 0) : (t.plInr || 0);
+            totalPL += plValue;
+            const isWin = plValue >= 0;
             const plColor = isWin ? '#34C759' : '#FF3B30';
+            const entry = t.entryPrice || 0;
+            const sl = t.stopLoss || '-';
+            const tp = t.takeProfit || '-';
             return `
                 <tr>
                     <td>${new Date(t.entryDate).toLocaleDateString()}</td>
                     <td>${t.ticker}</td>
                     <td>${t.direction}</td>
-                    <td>₹${t.entryPrice}</td>
-                    <td>${t.exitPrice ? '₹' + t.exitPrice : '-'}</td>
+                    <td>${currencySymbol}${entry.toFixed(2)}</td>
+                    <td>${sl !== '-' ? currencySymbol + sl.toFixed(2) : sl}</td>
+                    <td>${tp !== '-' ? currencySymbol + tp.toFixed(2) : tp}</td>
                     <td>${t.quantity}</td>
-                    <td style="color: ${plColor}">₹${(t.pl || 0).toFixed(2)}</td>
+                    <td style="color: ${plColor}">${currencySymbol}${plValue.toFixed(2)}</td>
                     <td>${t.status}</td>
                 </tr>
             `;
@@ -126,14 +140,15 @@ export default function ProfileScreen() {
                     <style>
                         body { font-family: 'Helvetica', sans-serif; padding: 20px; }
                         h1 { color: #333; }
+                        .currency-badge { display: inline-block; background: #2563EB; color: white; padding: 4px 12px; border-radius: 8px; font-size: 14px; margin-left: 10px; }
                         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
                         th { background-color: #f2f2f2; }
                         .summary { margin-top: 20px; font-size: 18px; font-weight: bold; }
                     </style>
                 </head>
                 <body>
-                    <h1>Trade History Report</h1>
+                    <h1>Trade History Report <span class="currency-badge">${exportCurrency}</span></h1>
                     <p>Range: ${new Date(dateRange.startDate).toLocaleDateString()} - ${new Date(dateRange.endDate).toLocaleDateString()}</p>
                     
                     <table>
@@ -143,7 +158,8 @@ export default function ProfileScreen() {
                                 <th>Ticker</th>
                                 <th>Direction</th>
                                 <th>Entry</th>
-                                <th>Exit</th>
+                                <th>Stop Loss</th>
+                                <th>Take Profit</th>
                                 <th>Qty</th>
                                 <th>P&L</th>
                                 <th>Status</th>
@@ -153,7 +169,7 @@ export default function ProfileScreen() {
                     </table>
 
                     <div class="summary">
-                        Total P&L: <span style="color: ${totalPL >= 0 ? 'green' : 'red'}">₹${totalPL.toFixed(2)}</span>
+                        Total P&L: <span style="color: ${totalPL >= 0 ? 'green' : 'red'}">${currencySymbol}${totalPL.toFixed(2)}</span>
                     </div>
                 </body>
             </html>
@@ -162,7 +178,7 @@ export default function ProfileScreen() {
         const { uri } = await Print.printToFileAsync({ html });
         const startStr = new Date(dateRange.startDate).toISOString().split('T')[0];
         const endStr = new Date(dateRange.endDate).toISOString().split('T')[0];
-        const fileName = `trades_${startStr}_to_${endStr}.pdf`;
+        const fileName = `trades_${exportCurrency}_${startStr}_to_${endStr}.pdf`;
 
         // @ts-ignore
         const newPath = (FileSystem.documentDirectory || FileSystem.cacheDirectory) + fileName;
@@ -190,9 +206,6 @@ export default function ProfileScreen() {
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.header}>
                     <Text style={[styles.headerTitle, { color: colors.text }]}>Profile & Export</Text>
-                    <TouchableOpacity onPress={handleLogout} style={styles.logoutHeaderBtn}>
-                        <Ionicons name="log-out-outline" size={24} color={colors.danger} />
-                    </TouchableOpacity>
                 </View>
 
                 <ScrollView contentContainerStyle={styles.content}>
@@ -294,6 +307,52 @@ export default function ProfileScreen() {
                                         <Text style={[styles.dateText, { color: colors.text }]}>
                                             {new Date(dateRange.endDate).toLocaleDateString()}
                                         </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Currency Toggle for Export */}
+                            <View style={{ marginBottom: 20 }}>
+                                <Text style={[styles.dateLabel, { color: colors.textMuted, marginBottom: 8 }]}>Export Currency</Text>
+                                <View style={{ flexDirection: 'row', gap: 12 }}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.currencyToggleBtn,
+                                            {
+                                                backgroundColor: exportCurrency === 'USD' ? colors.primary : (isDark ? '#FFFFFF05' : '#F2F2F7'),
+                                                borderColor: exportCurrency === 'USD' ? colors.primary : colors.border
+                                            }
+                                        ]}
+                                        onPress={() => setExportCurrency('USD')}
+                                    >
+                                        <Ionicons
+                                            name="logo-usd"
+                                            size={20}
+                                            color={exportCurrency === 'USD' ? '#FFF' : colors.text}
+                                        />
+                                        <Text style={[
+                                            styles.currencyToggleText,
+                                            { color: exportCurrency === 'USD' ? '#FFF' : colors.text }
+                                        ]}>USD</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.currencyToggleBtn,
+                                            {
+                                                backgroundColor: exportCurrency === 'INR' ? colors.primary : (isDark ? '#FFFFFF05' : '#F2F2F7'),
+                                                borderColor: exportCurrency === 'INR' ? colors.primary : colors.border
+                                            }
+                                        ]}
+                                        onPress={() => setExportCurrency('INR')}
+                                    >
+                                        <Text style={[
+                                            styles.currencyToggleText,
+                                            { color: exportCurrency === 'INR' ? '#FFF' : colors.text, fontSize: 18 }
+                                        ]}>₹</Text>
+                                        <Text style={[
+                                            styles.currencyToggleText,
+                                            { color: exportCurrency === 'INR' ? '#FFF' : colors.text }
+                                        ]}>INR</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -451,4 +510,18 @@ const styles = StyleSheet.create({
     creditBox: { width: '100%', padding: 16, borderRadius: 16, alignItems: 'center', borderWidth: 1, marginBottom: 16 },
     creditText: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
     pgtech: { fontSize: 20, fontWeight: 'bold' },
+    currencyToggleBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        gap: 6
+    },
+    currencyToggleText: {
+        fontSize: 14,
+        fontWeight: '600'
+    },
 });

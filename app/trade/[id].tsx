@@ -46,11 +46,9 @@ export default function TradeDetails() {
 
         try {
             const fileName = `trade_${trade.ticker}_${id}.jpg`;
-            // @ts-ignore
-            const result = await FileSystem.downloadAsync(
-                trade.imageUrl,
-                FileSystem.documentDirectory + fileName
-            );
+            // Download to a temporary location
+            const fileUri = `${(FileSystem as any).cacheDirectory}${fileName}`;
+            const result = await FileSystem.downloadAsync(trade.imageUrl, fileUri);
 
             await Sharing.shareAsync(result.uri);
         } catch (e) {
@@ -98,9 +96,12 @@ export default function TradeDetails() {
                         {trade.status}
                     </Text>
                     <Text style={[styles.plText, {
-                        color: (trade.pl || 0) >= 0 ? colors.success : colors.danger
+                        color: trade.status === 'OPEN' ? colors.warning : ((trade.plUsd || 0) >= 0 ? colors.success : colors.danger)
                     }]}>
-                        {(trade.pl || 0) >= 0 ? '+' : ''}₹{trade.pl?.toFixed(2)}
+                        {trade.status === 'OPEN' && trade.rewardAmount
+                            ? `~$${trade.rewardAmount?.toFixed(2)}`
+                            : `${(trade.plUsd || 0) >= 0 ? '+' : ''}$${(trade.plUsd || 0).toFixed(2)}`
+                        }
                     </Text>
                 </View>
 
@@ -118,11 +119,13 @@ export default function TradeDetails() {
                     </View>
                     <View style={[styles.gridItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
                         <Text style={[styles.label, { color: colors.textMuted }]}>Entry</Text>
-                        <Text style={[styles.value, { color: colors.text }]}>₹{trade.entryPrice}</Text>
+                        <Text style={[styles.value, { color: colors.text }]}>${trade.entryPrice}</Text>
                     </View>
                     <View style={[styles.gridItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                        <Text style={[styles.label, { color: colors.textMuted }]}>Exit</Text>
-                        <Text style={[styles.value, { color: colors.text }]}>₹{trade.exitPrice || '-'}</Text>
+                        <Text style={[styles.label, { color: colors.textMuted }]}>Target (TP)</Text>
+                        <Text style={[styles.value, { color: colors.text }]}>
+                            {trade.takeProfit ? `$${trade.takeProfit}` : '-'}
+                        </Text>
                     </View>
                 </View>
 
@@ -134,6 +137,131 @@ export default function TradeDetails() {
                             weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                         })}
                     </Text>
+                </View>
+
+                {/* Trade Financial Details */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Financial Details</Text>
+
+                    {/* P/L Section */}
+                    <View style={[styles.detailCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <View style={styles.detailHeader}>
+                            <Ionicons name="wallet-outline" size={20} color={colors.primary} />
+                            <Text style={[styles.detailCardTitle, { color: colors.text }]}>Profit & Loss</Text>
+                        </View>
+                        <View style={styles.detailRow}>
+                            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>USD</Text>
+                            <Text style={[styles.detailValue, {
+                                color: (trade.plUsd || 0) >= 0 ? colors.success : colors.danger,
+                                fontWeight: 'bold',
+                                fontSize: 20
+                            }]}>
+                                {(trade.plUsd || 0) >= 0 ? '+' : ''}${(trade.plUsd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Text>
+                        </View>
+                        <View style={styles.detailRow}>
+                            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>INR</Text>
+                            <Text style={[styles.detailValue, {
+                                color: (trade.plInr || 0) >= 0 ? colors.success : colors.danger
+                            }]}>
+                                {(trade.plInr || 0) >= 0 ? '+' : ''}₹{(trade.plInr || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Risk & Reward Section */}
+                    <View style={[styles.detailCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 12 }]}>
+                        <View style={styles.detailHeader}>
+                            <Ionicons name="analytics-outline" size={20} color={colors.primary} />
+                            <Text style={[styles.detailCardTitle, { color: colors.text }]}>Risk & Reward</Text>
+                        </View>
+
+                        {/* Reward */}
+                        <View style={[styles.rrBlock, { backgroundColor: 'rgba(74, 222, 128, 0.1)', borderRadius: 12, padding: 12, marginBottom: 8 }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                <Ionicons name="trending-up" size={16} color={colors.success} />
+                                <Text style={[styles.rrLabel, { color: colors.success, marginLeft: 6 }]}>Potential Reward (TP)</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>USD</Text>
+                                <Text style={[styles.detailValue, { color: colors.success, fontWeight: 'bold' }]}>
+                                    +${(trade.rewardAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>INR</Text>
+                                <Text style={[styles.detailValue, { color: colors.success }]}>
+                                    +₹{(trade.rewardAmountInr || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Risk */}
+                        <View style={[styles.rrBlock, { backgroundColor: 'rgba(248, 113, 113, 0.1)', borderRadius: 12, padding: 12 }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                <Ionicons name="trending-down" size={16} color={colors.danger} />
+                                <Text style={[styles.rrLabel, { color: colors.danger, marginLeft: 6 }]}>Potential Risk (SL)</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>USD</Text>
+                                <Text style={[styles.detailValue, { color: colors.danger, fontWeight: 'bold' }]}>
+                                    -${(trade.riskAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>INR</Text>
+                                <Text style={[styles.detailValue, { color: colors.danger }]}>
+                                    -₹{(trade.riskAmountInr || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Risk-Reward Ratio */}
+                    {trade.riskReward && (
+                        <View style={[styles.rrRatioCard, { backgroundColor: colors.primary, marginTop: 12 }]}>
+                            <Text style={styles.rrRatioLabel}>Risk : Reward Ratio</Text>
+                            <Text style={styles.rrRatioValue}>1 : {trade.riskReward.toFixed(2)}</Text>
+                        </View>
+                    )}
+
+                    {/* Stop Loss & Take Profit Prices */}
+                    <View style={[styles.detailCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 12 }]}>
+                        <View style={styles.detailHeader}>
+                            <Ionicons name="pricetag-outline" size={20} color={colors.primary} />
+                            <Text style={[styles.detailCardTitle, { color: colors.text }]}>Price Levels</Text>
+                        </View>
+                        <View style={styles.detailRow}>
+                            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Entry Price</Text>
+                            <Text style={[styles.detailValue, { color: colors.text }]}>
+                                {trade.entryPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })}
+                            </Text>
+                        </View>
+                        {trade.stopLoss && (
+                            <View style={styles.detailRow}>
+                                <Text style={[styles.detailLabel, { color: colors.danger }]}>Stop Loss</Text>
+                                <Text style={[styles.detailValue, { color: colors.danger }]}>
+                                    {trade.stopLoss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })}
+                                </Text>
+                            </View>
+                        )}
+                        {trade.takeProfit && (
+                            <View style={styles.detailRow}>
+                                <Text style={[styles.detailLabel, { color: colors.success }]}>Take Profit</Text>
+                                <Text style={[styles.detailValue, { color: colors.success }]}>
+                                    {trade.takeProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 })}
+                                </Text>
+                            </View>
+                        )}
+                        {trade.exchangeRate && (
+                            <View style={[styles.detailRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }]}>
+                                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Exchange Rate</Text>
+                                <Text style={[styles.detailValue, { color: colors.textMuted }]}>
+                                    ₹{trade.exchangeRate.toFixed(2)} / USD
+                                </Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
 
                 {/* Screenshots Gallery */}
@@ -322,5 +450,70 @@ const styles = StyleSheet.create({
         right: 20,
         zIndex: 10,
         padding: 10,
+    },
+    // Financial Detail Styles
+    detailCard: {
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+    },
+    detailHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
+    },
+    detailCardTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    detailRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    detailLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    detailValue: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    rrBlock: {
+        // Styles applied inline
+    },
+    rrLabel: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    rrRatioCard: {
+        borderRadius: 16,
+        padding: 20,
+        alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    rrRatioLabel: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 8,
+        opacity: 0.9,
+    },
+    rrRatioValue: {
+        color: '#FFF',
+        fontSize: 32,
+        fontWeight: 'bold',
+        letterSpacing: 1,
     },
 });

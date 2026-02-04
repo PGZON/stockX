@@ -2,6 +2,7 @@ import { FadeInView } from '@/components/FadeInView';
 import { MetricsDisplay } from '@/components/MetricsDisplay';
 import { RecentActivity } from '@/components/RecentActivity';
 import { Skeleton } from '@/components/Skeleton';
+import { useCurrency } from '@/context/CurrencyContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,12 +17,15 @@ const { width } = Dimensions.get('window');
 
 export default function Dashboard() {
   const { colors, theme, isDark } = useTheme();
+  const { currency, toggleCurrency } = useCurrency();
   const [refreshing, setRefreshing] = useState(false);
   const statsQuery = useQuery(api.trades.getDashboardStats);
   const loading = statsQuery === undefined;
 
   const stats = statsQuery || {
     totalPL: 0,
+    totalPLInr: 0,
+    totalPLUsd: 0,
     winRate: 0,
     totalTrades: 0,
     wins: 0,
@@ -30,6 +34,10 @@ export default function Dashboard() {
     recentTrades: [],
     avgWin: 0,
     avgLoss: 0,
+    avgWinInr: 0,
+    avgLossInr: 0,
+    avgWinUsd: 0,
+    avgLossUsd: 0,
     profitFactor: 0,
     bestRun: 0
   };
@@ -49,6 +57,13 @@ export default function Dashboard() {
     : ['#2563EB', '#1d4ed8'] as const; // Blue 600 -> Blue 700
 
   const heroBorder = isDark ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.2)';
+
+  // Use actual USD/INR values from backend
+  const totalPLDisplay = currency === 'USD'
+    ? stats.totalPLUsd
+    : stats.totalPLInr;
+  const currencySymbol = currency === 'USD' ? '$' : '₹';
+  const decimals = currency === 'USD' ? 2 : 0;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -113,11 +128,20 @@ export default function Dashboard() {
                         <Ionicons name="wallet-outline" size={16} color="#93C5FD" />
                         <Text style={styles.netProfitText}>Net Profit</Text>
                       </View>
-                      <Ionicons name="chevron-forward" size={20} color="#BFDBFE" />
+
+                      {/* Currency Toggle */}
+                      <TouchableOpacity
+                        style={styles.currencyToggle}
+                        onPress={toggleCurrency}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.currencyToggleText}>{currency}</Text>
+                        <Ionicons name="swap-horizontal" size={16} color="#BFDBFE" />
+                      </TouchableOpacity>
                     </View>
 
                     <Text style={styles.heroValue}>
-                      ₹{stats.totalPL.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {currencySymbol}{totalPLDisplay.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
                     </Text>
 
                     <View style={styles.heroFooter}>
@@ -157,8 +181,12 @@ export default function Dashboard() {
                   totalTrades={stats.totalTrades || 0}
                   avgWin={stats.avgWin || 0}
                   avgLoss={stats.avgLoss || 0}
-                  bestRun={stats.bestRun || 0}
+                  avgWinUsd={stats.avgWinUsd || 0}
+                  avgLossUsd={stats.avgLossUsd || 0}
+                  avgWinInr={stats.avgWinInr || 0}
+                  avgLossInr={stats.avgLossInr || 0}
                   trades={stats.recentTrades || []}
+                  currency={currency}
                 />
               </FadeInView>
 
@@ -228,6 +256,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.1)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20
   },
   netProfitText: { color: '#BFDBFE', fontWeight: '600', fontSize: 14 },
+  currencyToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  currencyToggleText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
   heroValue: {
     fontSize: 48, fontWeight: '800', color: '#FFFFFF', marginBottom: 24, letterSpacing: -1
   },

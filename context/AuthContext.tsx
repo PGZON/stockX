@@ -1,5 +1,5 @@
+import storage from '@/utils/storage';
 import { useRouter, useSegments } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 type User = {
@@ -34,8 +34,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const checkAuth = async () => {
             try {
                 // Check for stored session
-                const token = await SecureStore.getItemAsync('auth_token');
-                const userData = await SecureStore.getItemAsync('user_data');
+                const token = await storage.getItem('auth_token');
+                const userData = await storage.getItem('user_data');
 
                 if (token && userData) {
                     setUser(JSON.parse(userData));
@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         if (isLoading) return;
 
-        const inAuthGroup = segments[0] === '(auth)' || segments[0] === 'login';
+        const inAuthGroup = segments[0] === 'login';
 
         if (!user && !inAuthGroup) {
             // Redirect to login if not authenticated
@@ -66,8 +66,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const signIn = async (token: string, userData: User) => {
         try {
-            await SecureStore.setItemAsync('auth_token', token);
-            await SecureStore.setItemAsync('user_data', JSON.stringify(userData));
+            await storage.setItem('auth_token', token);
+            await storage.setItem('user_data', JSON.stringify(userData));
             setUser(userData);
         } catch (error) {
             console.error('Sign in error:', error);
@@ -77,8 +77,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const signOut = async () => {
         try {
-            await SecureStore.deleteItemAsync('auth_token');
-            await SecureStore.deleteItemAsync('user_data');
+            await storage.removeItem('auth_token');
+            await storage.removeItem('user_data');
             setUser(null);
         } catch (error) {
             console.error('Sign out error:', error);

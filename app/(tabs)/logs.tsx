@@ -74,11 +74,28 @@ export default function LogsScreen() {
                             </View>
                         </View>
 
-                        <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                            <Text style={[styles.plText, { color: item.pl >= 0 ? colors.success : colors.danger }]}>
-                                {item.pl >= 0 ? '+' : ''}₹{Math.abs(item.pl).toFixed(2)}
-                            </Text>
+                        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                            {item.status === 'OPEN' ? (
+                                <>
+                                    <Text style={[styles.plText, { color: colors.warning, fontSize: 13 }]}>
+                                        ~${item.rewardAmount?.toFixed(2) || '0.00'}
+                                    </Text>
+                                    <Text style={[styles.plText, { color: colors.warning, fontSize: 13 }]}>
+                                        ~₹{item.rewardAmountInr?.toFixed(0) || '0'}
+                                    </Text>
+                                </>
+                            ) : (
+                                <>
+                                    <Text style={[styles.plText, { color: item.pl >= 0 ? colors.success : colors.danger, fontSize: 13 }]}>
+                                        {item.plUsd >= 0 ? '+' : ''}${item.plUsd?.toFixed(2) || '0.00'}
+                                    </Text>
+                                    <Text style={[styles.plText, { color: item.pl >= 0 ? colors.success : colors.danger, fontSize: 13 }]}>
+                                        {item.pl >= 0 ? '+' : ''}₹{Math.abs(item.pl).toFixed(0)}
+                                    </Text>
+                                </>
+                            )}
                             <View style={[styles.statusTag, {
+                                marginTop: 4,
                                 backgroundColor: item.status === 'WIN' ? `${colors.success}20` : (item.status === 'LOSS' ? `${colors.danger}20` : `${colors.warning}20`)
                             }]}>
                                 <Text style={[styles.statusText, {
@@ -87,7 +104,6 @@ export default function LogsScreen() {
                             </View>
                         </View>
                     </View>
-
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
                     <View style={styles.cardBody}>
@@ -97,8 +113,10 @@ export default function LogsScreen() {
                         </View>
                         <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
                         <View style={styles.stat}>
-                            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Exit</Text>
-                            <Text style={[styles.statValue, { color: colors.text }]}>{item.exitPrice ? `₹${item.exitPrice}` : '-'}</Text>
+                            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Exit / TP</Text>
+                            <Text style={[styles.statValue, { color: colors.text }]}>
+                                {item.exitPrice ? `₹${item.exitPrice}` : (item.takeProfit ? `₹${item.takeProfit}` : '-')}
+                            </Text>
                         </View>
                         <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
                         <View style={styles.stat}>

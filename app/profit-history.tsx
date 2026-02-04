@@ -1,4 +1,5 @@
 import { FadeInView } from '@/components/FadeInView';
+import { useCurrency } from '@/context/CurrencyContext';
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ProfitHistory() {
     const { colors, isDark } = useTheme();
+    const { currency, toggleCurrency } = useCurrency();
     const trades = useQuery(api.trades.getTrades, {});
     const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
 
@@ -23,10 +25,18 @@ export default function ProfitHistory() {
         });
     }, [trades, sortOrder]);
 
-    const totalPL = sortedTrades.reduce((acc, curr) => acc + (curr.pl || 0), 0);
+    // Calculate total P/L based on selected currency
+    const totalPL = sortedTrades.reduce((acc, curr) => {
+        const plValue = currency === 'USD' ? (curr.plUsd || 0) : (curr.plInr || 0);
+        return acc + plValue;
+    }, 0);
+
+    const currencySymbol = currency === 'USD' ? '$' : '₹';
+    const decimals = currency === 'USD' ? 2 : 0;
 
     const renderItem = ({ item, index }: { item: any; index: number }) => {
-        const isProfit = (item.pl || 0) >= 0;
+        const plValue = currency === 'USD' ? (item.plUsd || 0) : (item.plInr || 0);
+        const isProfit = plValue >= 0;
         const date = new Date(item.entryDate);
 
         return (
@@ -60,7 +70,7 @@ export default function ProfitHistory() {
 
                         <View style={styles.cardRight}>
                             <Text style={[styles.amount, { color: isProfit ? colors.success : colors.text }]}>
-                                {isProfit ? '+' : '-'}₹{Math.abs(item.pl || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {isProfit ? '+' : '-'}{currencySymbol}{Math.abs(plValue).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
                             </Text>
                             <View style={[styles.statusBadge, { backgroundColor: isProfit ? `${colors.success}15` : `${colors.danger}15` }]}>
                                 <Text style={[styles.statusText, { color: isProfit ? colors.success : colors.danger }]}>
@@ -97,16 +107,25 @@ export default function ProfitHistory() {
                         <Ionicons name="arrow-back" size={24} color={colors.text} />
                     </TouchableOpacity>
                     <Text style={[styles.headerTitle, { color: colors.text }]}>Transactions</Text>
-                    <TouchableOpacity
-                        style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-                        onPress={() => setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC')}
-                    >
-                        <Ionicons
-                            name={sortOrder === 'DESC' ? "list" : "list-outline"}
-                            size={20}
-                            color={colors.text}
-                        />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {/* Currency Toggle */}
+                        <TouchableOpacity
+                            style={[styles.iconBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                            onPress={toggleCurrency}
+                        >
+                            <Text style={styles.currencyText}>{currency}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                            onPress={() => setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC')}
+                        >
+                            <Ionicons
+                                name={sortOrder === 'DESC' ? "list" : "list-outline"}
+                                size={20}
+                                color={colors.text}
+                            />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* Summary Header */}
@@ -118,7 +137,7 @@ export default function ProfitHistory() {
                         <View>
                             <Text style={[styles.summaryLabel, { color: isDark ? '#BFDBFE' : '#1e40af' }]}>Total Net P/L</Text>
                             <Text style={[styles.summaryValue, { color: totalPL >= 0 ? (isDark ? '#4ADE80' : '#16A34A') : '#F87171' }]}>
-                                ₹{totalPL.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                {currencySymbol}{totalPL.toLocaleString(undefined, { minimumFractionDigits: decimals })}
                             </Text>
                         </View>
                         <View style={[styles.summaryIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.6)' }]}>
@@ -177,6 +196,11 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
+    },
+    currencyText: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: '#FFFFFF',
     },
     summaryContainer: {
         paddingHorizontal: 20,

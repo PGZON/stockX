@@ -8,13 +8,28 @@ export const addTrade = mutation({
         entryDate: v.number(),
         exitDate: v.optional(v.number()),
         entryPrice: v.number(),
-        exitPrice: v.optional(v.number()),
-        quantity: v.number(),
+        quantity: v.optional(v.number()),
+        lotSize: v.optional(v.number()),
         direction: v.string(),
+        type: v.optional(v.string()), // 'BUY' | 'SELL'
+
+        stopLoss: v.optional(v.number()),
+        takeProfit: v.optional(v.number()),
+
         status: v.string(),
         pl: v.optional(v.number()),
+        plUsd: v.optional(v.number()),
+        plInr: v.optional(v.number()),
+        exchangeRate: v.optional(v.number()),
+
         plPercent: v.optional(v.number()),
         riskReward: v.optional(v.number()),
+
+        riskAmount: v.optional(v.number()),
+        rewardAmount: v.optional(v.number()),
+        riskAmountInr: v.optional(v.number()),
+        rewardAmountInr: v.optional(v.number()),
+
         timeFrame: v.optional(v.string()),
         notes: v.optional(v.string()),
 
@@ -109,13 +124,16 @@ export const getDashboardStats = query({
         const trades = await ctx.db.query("trades").collect();
 
         const totalTrades = trades.length;
-        let totalPL = 0;
+        let totalPLInr = 0;
+        let totalPLUsd = 0;
         let wins = 0;
         let losses = 0;
         let breakEven = 0;
 
-        let totalWinAmt = 0;
-        let totalLossAmt = 0;
+        let totalWinAmtInr = 0;
+        let totalLossAmtInr = 0;
+        let totalWinAmtUsd = 0;
+        let totalLossAmtUsd = 0;
         let currentRun = 0;
         let bestRun = 0;
 
@@ -123,44 +141,57 @@ export const getDashboardStats = query({
         trades.sort((a, b) => a.entryDate - b.entryDate);
 
         trades.forEach((t) => {
-            if (t.pl) totalPL += t.pl;
+            // Use plInr and plUsd, fallback to pl if not available
+            const plValueInr = t.plInr ?? t.pl ?? 0;
+            const plValueUsd = t.plUsd ?? t.pl ?? 0;
+
+            totalPLInr += plValueInr;
+            totalPLUsd += plValueUsd;
 
             if (t.status === "WIN") {
                 wins++;
-                totalWinAmt += (t.pl || 0);
+                totalWinAmtInr += plValueInr;
+                totalWinAmtUsd += plValueUsd;
                 currentRun++;
                 if (currentRun > bestRun) bestRun = currentRun;
             } else if (t.status === "LOSS") {
                 losses++;
-                totalLossAmt += Math.abs(t.pl || 0);
+                totalLossAmtInr += Math.abs(plValueInr);
+                totalLossAmtUsd += Math.abs(plValueUsd);
                 currentRun = 0;
             } else {
                 breakEven++;
-                // Reset streak on BE? Depends on trader preference. keeping existing streak if BE is neutral 
-                // but usually breaks a "Win" streak. Let's say it breaks.
                 currentRun = 0;
             }
         });
 
         const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
-        const avgWin = wins > 0 ? totalWinAmt / wins : 0;
-        const avgLoss = losses > 0 ? totalLossAmt / losses : 0;
-        const profitFactor = totalLossAmt > 0 ? totalWinAmt / totalLossAmt : (totalWinAmt > 0 ? 100 : 0); // 100 if no losses but wins
+        const avgWinInr = wins > 0 ? totalWinAmtInr / wins : 0;
+        const avgLossInr = losses > 0 ? totalLossAmtInr / losses : 0;
+        const avgWinUsd = wins > 0 ? totalWinAmtUsd / wins : 0;
+        const avgLossUsd = losses > 0 ? totalLossAmtUsd / losses : 0;
+        const profitFactor = totalLossAmtInr > 0 ? totalWinAmtInr / totalLossAmtInr : (totalWinAmtInr > 0 ? 100 : 0);
 
         return {
-            totalPL,
+            totalPL: totalPLInr, // Backward compatibility (INR)
+            totalPLInr,
+            totalPLUsd,
             totalTrades,
             winRate,
             wins,
             losses,
             breakEven,
-            avgWin,
-            avgLoss,
+            avgWin: avgWinInr, // Backward compatibility (INR)
+            avgLoss: avgLossInr, // Backward compatibility (INR)
+            avgWinInr,
+            avgLossInr,
+            avgWinUsd,
+            avgLossUsd,
             profitFactor,
             bestRun,
             recentTrades: trades.slice(-2).reverse(),
             chartData: trades.map(t => ({
-                value: t.pl || 0,
+                value: t.plInr ?? t.pl ?? 0, // Use INR for chart
                 date: t.entryDate,
                 label: new Date(t.entryDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
             }))

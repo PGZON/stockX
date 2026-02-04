@@ -9,6 +9,8 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as exchangeRate from "../exchangeRate.js";
+import type * as instrumentConfig from "../instrumentConfig.js";
 import type * as trades from "../trades.js";
 
 import type {
@@ -19,6 +21,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  exchangeRate: typeof exchangeRate;
+  instrumentConfig: typeof instrumentConfig;
   trades: typeof trades;
 }>;
 

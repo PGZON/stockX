@@ -1,11 +1,11 @@
 import { useTheme } from '@/context/ThemeContext';
 import { api } from '@/convex/_generated/api';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from 'convex/react';
+import { useAction, useQuery } from 'convex/react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 
 interface MetricsProps {
@@ -14,15 +14,57 @@ interface MetricsProps {
     totalTrades: number;
     avgWin: number;
     avgLoss: number;
-    bestRun: number;
+    avgWinUsd?: number;
+    avgLossUsd?: number;
+    avgWinInr?: number;
+    avgLossInr?: number;
     trades?: any[];
+    currency?: 'USD' | 'INR';
 }
 
-export const MetricsDisplay = ({ wins, losses, totalTrades, avgWin, avgLoss, bestRun, trades: propTrades = [] }: MetricsProps) => {
+export const MetricsDisplay = ({
+    wins,
+    losses,
+    totalTrades,
+    avgWin,
+    avgLoss,
+    avgWinUsd = 0,
+    avgLossUsd = 0,
+    avgWinInr = 0,
+    avgLossInr = 0,
+    trades: propTrades = [],
+    currency = 'USD'
+}: MetricsProps) => {
     const { colors, isDark } = useTheme();
+    const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+    const [loadingRate, setLoadingRate] = useState(true);
+    const getExchangeRate = useAction(api.exchangeRate.getExchangeRate);
+
     // Fetch all trades to ensure detailed calendar history
     const allTradesQuery = useQuery(api.trades.getTrades, {});
     const trades = allTradesQuery || propTrades;
+
+    // Fetch exchange rate on mount
+    useEffect(() => {
+        const fetchRate = async () => {
+            setLoadingRate(true);
+            try {
+                const result = await getExchangeRate({});
+                setExchangeRate(result.rate);
+            } catch (error) {
+                console.error('Failed to fetch exchange rate:', error);
+                setExchangeRate(83.0); // Fallback
+            } finally {
+                setLoadingRate(false);
+            }
+        };
+
+        fetchRate();
+
+        // Refresh every 5 minutes
+        const interval = setInterval(fetchRate, 5 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, [getExchangeRate]);
 
     const markedDates = useMemo(() => {
         const marks: any = {};
@@ -47,7 +89,7 @@ export const MetricsDisplay = ({ wins, losses, totalTrades, avgWin, avgLoss, bes
         ? ['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.01)'] as const
         : ['#FFFFFF', '#F8FAFC'] as const;
 
-    const renderStatCard = (title: string, value: string, icon: any, color: string, subValue?: string) => (
+    const renderStatCard = (title: string, value: string, icon: any, color: string, subValue?: string, loading?: boolean) => (
         <LinearGradient
             colors={cardGradient}
             start={{ x: 0, y: 0 }}
@@ -60,18 +102,37 @@ export const MetricsDisplay = ({ wins, losses, totalTrades, avgWin, avgLoss, bes
                 </View>
                 <Text style={[styles.label, { color: colors.textMuted }]}>{title}</Text>
             </View>
-            <Text style={[styles.value, { color: colors.text }]}>{value}</Text>
-            {subValue && <Text style={[styles.subValue, { color: color }]}>{subValue}</Text>}
+            {loading ? (
+                <ActivityIndicator size="small" color={color} style={{ marginTop: 8 }} />
+            ) : (
+                <>
+                    <Text style={[styles.value, { color: colors.text }]}>{value}</Text>
+                    {subValue && <Text style={[styles.subValue, { color: color }]}>{subValue}</Text>}
+                </>
+            )}
         </LinearGradient>
     );
+
+    // Determine which values to display based on currency
+    const displayAvgWin = currency === 'USD' ? avgWinUsd : avgWinInr;
+    const displayAvgLoss = currency === 'USD' ? avgLossUsd : avgLossInr;
+    const currencySymbol = currency === 'USD' ? '$' : '₹';
+    const decimals = currency === 'USD' ? 2 : 0;
 
     return (
         <View style={styles.container}>
             {/* Stats Grid */}
             <View style={styles.grid}>
-                {renderStatCard('Best Run', `${bestRun} Wins`, 'trophy', '#FACC15')}
-                {renderStatCard('Avg Win', `₹${avgWin.toFixed(0)}`, 'trending-up', colors.success)}
-                {renderStatCard('Avg Loss', `₹${Math.abs(avgLoss).toFixed(0)}`, 'trending-down', colors.danger)}
+                {renderStatCard(
+                    'Exchange Rate',
+                    exchangeRate ? `₹${exchangeRate.toFixed(2)}` : '---',
+                    'cash-outline',
+                    '#10B981',
+                    '1 USD',
+                    loadingRate
+                )}
+                {renderStatCard('Avg Win', `${currencySymbol}${displayAvgWin.toFixed(decimals)}`, 'trending-up', colors.success)}
+                {renderStatCard('Avg Loss', `${currencySymbol}${Math.abs(displayAvgLoss).toFixed(decimals)}`, 'trending-down', colors.danger)}
             </View>
 
             {/* Archive Calendar */}
